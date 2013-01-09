@@ -99,7 +99,8 @@ cp -pr cpucycles/* "$work"
 cp -pr "$work"/lib/* "$lib"
 cp -pr "$work"/include/* "$include"
 
-okabi \
+#okabi 
+echo -n "" \
 | while read abi
 do
   echo "=== `date` === building gmp for $abi"
