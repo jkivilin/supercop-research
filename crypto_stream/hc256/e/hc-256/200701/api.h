@@ -1,2 +1,0 @@
-#define crypto_stream_hc256_e_hc_256_200701_KEYBYTES 32
-#define crypto_stream_hc256_e_hc_256_200701_NONCEBYTES 16

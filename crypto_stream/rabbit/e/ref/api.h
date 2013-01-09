@@ -1,2 +1,0 @@
-#define crypto_stream_rabbit_e_ref_KEYBYTES 16
-#define crypto_stream_rabbit_e_ref_NONCEBYTES 8

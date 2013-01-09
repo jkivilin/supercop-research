@@ -1,2 +1,0 @@
-#define crypto_stream_lexv2_e_v2_ref_KEYBYTES 16
-#define crypto_stream_lexv2_e_v2_ref_NONCEBYTES 16

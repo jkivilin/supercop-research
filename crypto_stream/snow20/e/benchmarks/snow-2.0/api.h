@@ -1,2 +1,0 @@
-#define crypto_stream_snow20_e_benchmarks_snow_2_0_KEYBYTES 32
-#define crypto_stream_snow20_e_benchmarks_snow_2_0_NONCEBYTES 16

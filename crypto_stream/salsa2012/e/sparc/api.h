@@ -1,2 +1,0 @@
-#define crypto_stream_salsa2012_e_sparc_KEYBYTES 32
-#define crypto_stream_salsa2012_e_sparc_NONCEBYTES 8

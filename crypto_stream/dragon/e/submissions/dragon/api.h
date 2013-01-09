@@ -1,2 +1,0 @@
-#define crypto_stream_dragon_e_submissions_dragon_KEYBYTES 32
-#define crypto_stream_dragon_e_submissions_dragon_NONCEBYTES 32

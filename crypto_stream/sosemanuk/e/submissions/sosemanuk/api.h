@@ -1,2 +1,0 @@
-#define crypto_stream_sosemanuk_e_submissions_sosemanuk_KEYBYTES 32
-#define crypto_stream_sosemanuk_e_submissions_sosemanuk_NONCEBYTES 16
