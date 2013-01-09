@@ -123,7 +123,7 @@ do
 	  && ./configure --enable-cxx \
 	     ABI="$gmpabi" \
 	     CC="$c" CXX="$cpp" CFLAGS="$copts" CXXFLAGS="$cppopts" LDFLAGS="$copts" \
-	  && make \
+	  && make -j6 \
 	  && make check \
 	  && cp gmp.h gmpxx.h gmp-impl.h longlong.h config.h gmp-mparam.h fib_table.h mp_bases.h "$include/$abi" \
 	  && ( ranlib ".libs/libgmp.a" || : ) \
@@ -153,7 +153,7 @@ do
     mkdir -p "$work"
     cp -pr cryptopp-561/* "$work"
     ( cd "$work" \
-      && make CXX="$cpp" CXXFLAGS="-DNDEBUG $cppopts" LDFLAGS="$cppopts" \
+      && make -j6 CXX="$cpp" CXXFLAGS="-DNDEBUG $cppopts" LDFLAGS="$cppopts" \
       && cp libcryptopp.a "$lib/$abi/libcryptopp.a" \
       && cp *.h "$include/$abi/cryptopp/"
     ) && break
