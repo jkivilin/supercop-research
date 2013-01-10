@@ -1,3 +1,4 @@
 *~
+*.o
 bench
 nohup.out
