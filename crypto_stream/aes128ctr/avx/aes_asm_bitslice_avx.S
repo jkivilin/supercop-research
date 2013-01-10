@@ -628,7 +628,7 @@ aes_keyshed_bitslice_avx:
 .global aes_avx_blk8
 .type   aes_avx_blk8,@function;
 
-aes_avx_ctr_blk8:
+aes_avx_blk8:
 	/* input:
 	 *	%rdi: ctx, CTX
 	 *	%xmm0-%xmm7: eight input/output blocks
