@@ -624,54 +624,15 @@ aes_keyshed_bitslice_avx:
 
 	ret;
 
-#define inc_le128(x, minus_one, tmp) \
-	vpcmpeqq minus_one, x, tmp; \
-	vpsubq minus_one, x, x; \
-	vpslldq $8, tmp, tmp; \
-	vpsubq tmp, x, x;
-
-#define load_ctr_8way(iv, bswap, x0, x1, x2, x3, x4, x5, x6, x7, t0, t1, t2) \
-	vpcmpeqd t0, t0, t0; \
-	vpsrldq $8, t0, t0; /* low: -1, high: 0 */ \
-	vmovdqa bswap, t1; \
-	\
-	/* load IV and byteswap */ \
-	vmovdqu (iv), x7; \
-	vpshufb t1, x7, x0; \
-	\
-	/* construct IVs */ \
-	inc_le128(x7, t0, t2); \
-	vpshufb t1, x7, x1; \
-	inc_le128(x7, t0, t2); \
-	vpshufb t1, x7, x2; \
-	inc_le128(x7, t0, t2); \
-	vpshufb t1, x7, x3; \
-	inc_le128(x7, t0, t2); \
-	vpshufb t1, x7, x4; \
-	inc_le128(x7, t0, t2); \
-	vpshufb t1, x7, x5; \
-	inc_le128(x7, t0, t2); \
-	vpshufb t1, x7, x6; \
-	inc_le128(x7, t0, t2); \
-	vmovdqa x7, t2; \
-	vpshufb t1, x7, x7; \
-	inc_le128(t2, t0, t1); \
-	vmovdqu t2, (iv);
-
 .align 8
-.global aes_avx_ctr_blk8
-.type   aes_avx_ctr_blk8,@function;
+.global aes_avx_blk8
+.type   aes_avx_blk8,@function;
 
 aes_avx_ctr_blk8:
 	/* input:
 	 *	%rdi: ctx, CTX
-	 *	%rsi: IV
-	 *	%rdx: in, might be NULL (copy stream to out) or not (xor output)
-	 *	%rcx: out
+	 *	%xmm0-%xmm7: eight input/output blocks
 	 */
-
-	load_ctr_8way(%rsi, .Lbswap128_mask, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4,
-		      %xmm5, %xmm6, %xmm7, %xmm8, %xmm9, %xmm10);
 
 	movl	nr(CTX), %eax;
 	decl	%eax;
@@ -711,36 +672,6 @@ aes_avx_ctr_blk8:
 
 	bitslice(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
 		 %xmm8, %xmm9);
-
-	testq	%rdx, %rdx;
-	jnz	.Lenc_xor;
-
-	vmovdqu %xmm0, 0*16(%rcx);
-	vmovdqu %xmm1, 1*16(%rcx);
-	vmovdqu %xmm2, 2*16(%rcx);
-	vmovdqu %xmm3, 3*16(%rcx);
-	vmovdqu %xmm4, 4*16(%rcx);
-	vmovdqu %xmm5, 5*16(%rcx);
-	vmovdqu %xmm6, 6*16(%rcx);
-	vmovdqu %xmm7, 7*16(%rcx);
-
-	ret;
-
-.Lenc_xor:
-
-#define vpxor_unaligned(x, in, out) \
-	vmovdqu	in, %xmm15; \
-	vpxor	x, %xmm15, x; \
-	vmovdqu	x, out;
-
-	vpxor_unaligned(%xmm0, 0*16(%rdx), 0*16(%rcx));
-	vpxor_unaligned(%xmm1, 1*16(%rdx), 1*16(%rcx));
-	vpxor_unaligned(%xmm2, 2*16(%rdx), 2*16(%rcx));
-	vpxor_unaligned(%xmm3, 3*16(%rdx), 3*16(%rcx));
-	vpxor_unaligned(%xmm4, 4*16(%rdx), 4*16(%rcx));
-	vpxor_unaligned(%xmm5, 5*16(%rdx), 5*16(%rcx));
-	vpxor_unaligned(%xmm6, 6*16(%rdx), 6*16(%rcx));
-	vpxor_unaligned(%xmm7, 7*16(%rdx), 7*16(%rcx));
 
 	ret;
 

@@ -810,7 +810,131 @@ static void aes_init_bitslice(struct aes_ctx_bitslice *ctx, const uint8_t *key, 
 		aes_keyshed_bitslice_avx(&keysched[i * AES_MAX_NB], (uint32_t*)ctx->bitsliced_keysched[i]);
 }
 
-extern void aes_avx_ctr_blk8(struct aes_ctx_bitslice *ctx, struct aes_block *iv, const uint8_t *in, uint8_t *out);
+#define unlikely(x)	__builtin_expect((x),0)
+#define likely(x)	__builtin_expect(!!(x),1)
+
+extern void aes_avx_blk8(struct aes_ctx_bitslice *ctx);
+
+static void aes_avx_ctr_blk8(struct aes_ctx_bitslice *ctx, struct aes_block *iv,
+			     const uint8_t *in, uint8_t *out, unsigned int len)
+{
+	static const uint8_t bswap128[16] = { 15, 14, 13, 12, 11, 10, 9, 8,
+					      7, 6, 5, 4, 3, 2, 1, 0 };
+	unsigned int last_len = len % BLOCKSIZE;
+	unsigned int nblocks = len / BLOCKSIZE;
+	unsigned int i;
+	uint8_t lastbuf[BLOCKSIZE];
+
+	__asm__ __volatile__ (
+		"vpcmpeqd %%xmm15, %%xmm15, %%xmm15;\n"
+		"vpsrldq $8, %%xmm15, %%xmm15;\n" /* low: -1, high: 0 */
+		"vmovdqu %[bswap], %%xmm14;\n"
+		/* load IV */
+		"vmovdqu %[iv], %%xmm0;\n"
+		/* IV is big-endian, byteswap for further processing */
+		"vpshufb %%xmm14, %%xmm0, %%xmm13;\n"
+		:
+		: [bswap] "m" (*bswap128),
+		  [iv] "m" (*iv)
+		: "memory"
+	);
+
+#define INC_IV() \
+	__asm__ __volatile__ ( \
+		"vpcmpeqq %%xmm15, %%xmm13, %%xmm12;\n" \
+		"vpsubq %%xmm15, %%xmm13, %%xmm13;\n" \
+		"vpslldq $8, %%xmm12, %%xmm12;\n" \
+		"vpsubq %%xmm12, %%xmm13, %%xmm13;\n" \
+		::: \
+	)
+
+	/* %xmm0 filled, increase IV */
+	INC_IV();
+
+	/* Fill in IVs */
+	do {
+		unsigned int process_blks = nblocks + !!last_len;
+#define FILL_IV(n) \
+	if (unlikely(process_blks == n)) \
+		break; \
+	__asm__ __volatile__ ("vpshufb %%xmm14, %%xmm13, %%xmm" #n ";\n":::); \
+	INC_IV();
+
+		FILL_IV(1);
+		FILL_IV(2);
+		FILL_IV(3);
+		FILL_IV(4);
+		FILL_IV(5);
+		FILL_IV(6);
+		FILL_IV(7);
+	} while (0);
+
+	/* Store IV */
+	__asm__ __volatile__ (
+		/* byteswap IV, le => be */
+		"vpshufb %%xmm14, %%xmm13, %%xmm13;\n"
+		"vmovdqu %%xmm13, %[iv];\n"
+		: [iv] "=m" (*iv)
+		::
+	);
+
+	aes_avx_blk8(ctx);
+
+	if (in == NULL) {
+		do {
+#define STREAM_OUT(n) \
+	if (unlikely(nblocks == n)) { \
+		if (unlikely(last_len > 0)) \
+			__asm__ __volatile__ ("vmovdqu %%xmm"#n", %[lastbuf];\n": [lastbuf] "=m" (*lastbuf) :: "memory"); \
+		break; \
+	} \
+	__asm__ __volatile__ ("vmovdqu %%xmm"#n", %[out];\n": [out] "=m" (*out) :: "memory"); \
+	out += BLOCKSIZE;
+
+			STREAM_OUT(0);
+			STREAM_OUT(1);
+			STREAM_OUT(2);
+			STREAM_OUT(3);
+			STREAM_OUT(4);
+			STREAM_OUT(5);
+			STREAM_OUT(6);
+			STREAM_OUT(7);
+		} while (0);
+
+		for (i = 0; likely(i < last_len); i++)
+			out[i] = lastbuf[i];
+	} else {
+		do {
+#define STREAM_OUT_XOR(n) \
+	if (unlikely(nblocks == n)) { \
+		if (unlikely(last_len > 0)) \
+			__asm__ __volatile__ ("vmovdqu %%xmm"#n", %[lastbuf];\n": [lastbuf] "=m" (*lastbuf) :: "memory"); \
+		break; \
+	} \
+	__asm__ __volatile__ ( \
+		"vpxor %[in], %%xmm"#n", %%xmm"#n";\n" \
+		"vmovdqu %%xmm"#n", %[out];\n" \
+		: [out] "=m" (*out) \
+		: [in] "m" (*in) \
+		: "memory" \
+		); \
+	out += BLOCKSIZE; \
+	in += BLOCKSIZE;
+
+			STREAM_OUT_XOR(0);
+			STREAM_OUT_XOR(1);
+			STREAM_OUT_XOR(2);
+			STREAM_OUT_XOR(3);
+			STREAM_OUT_XOR(4);
+			STREAM_OUT_XOR(5);
+			STREAM_OUT_XOR(6);
+			STREAM_OUT_XOR(7);
+		} while (0);
+
+		for (i = 0; likely(i < last_len); i++)
+			out[i] = in[i] ^ lastbuf[i];
+	}
+}
 
 int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
@@ -822,22 +946,15 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	aes_init_bitslice(&ctx, k, CRYPTO_KEYBYTES);
 	memcpy(&iv, n, sizeof(iv));
 
-	while (inlen >= PARALLEL_BLOCKS * BLOCKSIZE) {
-		aes_avx_ctr_blk8(&ctx, &iv, in, out);
+	while (likely(inlen > 0)) {
+		unsigned int process_len = likely(inlen > PARALLEL_BLOCKS * BLOCKSIZE) ?
+					PARALLEL_BLOCKS * BLOCKSIZE : inlen;
 
-		inlen -= PARALLEL_BLOCKS * BLOCKSIZE;
-		out += PARALLEL_BLOCKS * BLOCKSIZE;
-		in += in ? PARALLEL_BLOCKS * BLOCKSIZE : 0;
-	}
+		aes_avx_ctr_blk8(&ctx, &iv, in, out, process_len);
 
-	if (inlen > 0) {
-		unsigned char buf[PARALLEL_BLOCKS * BLOCKSIZE];
-
-		if (in)
-			memcpy(buf, in, inlen);
-
-		aes_avx_ctr_blk8(&ctx, &iv, in, buf);
-		memcpy(out, buf, inlen);
+		inlen -= process_len;
+		out += process_len;
+		in += in ? process_len : 0;
 	}
 
 	return 0;
