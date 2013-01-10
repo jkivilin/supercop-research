@@ -822,6 +822,7 @@ static void aes_avx_ctr_blk8(struct aes_ctx_bitslice *ctx, struct aes_block *iv,
 					      7, 6, 5, 4, 3, 2, 1, 0 };
 	unsigned int last_len = len % BLOCKSIZE;
 	unsigned int nblocks = len / BLOCKSIZE;
+	unsigned int process_blks = (len + (BLOCKSIZE - 1)) / BLOCKSIZE;
 	unsigned int i;
 	uint8_t lastbuf[BLOCKSIZE];
 
@@ -853,7 +854,6 @@ static void aes_avx_ctr_blk8(struct aes_ctx_bitslice *ctx, struct aes_block *iv,
 
 	/* Fill in IVs */
 	do {
-		unsigned int process_blks = nblocks + !!last_len;
 #define FILL_IV(n) \
 	if (unlikely(process_blks == n)) \
 		break; \
@@ -884,12 +884,19 @@ static void aes_avx_ctr_blk8(struct aes_ctx_bitslice *ctx, struct aes_block *iv,
 		do {
 #define STREAM_OUT(n) \
 	if (unlikely(nblocks == n)) { \
-		if (unlikely(last_len > 0)) \
-			__asm__ __volatile__ ("vmovdqu %%xmm"#n", %[lastbuf];\n": [lastbuf] "=m" (*lastbuf) :: "memory"); \
+		if (likely(last_len == 0)) \
+			return; \
+		out += BLOCKSIZE * n; \
+		__asm__ __volatile__ ( \
+			"vmovdqu %%xmm"#n", %[lastbuf];\n" \
+			: [lastbuf] "=m" (*lastbuf) \
+			:: "memory"); \
 		break; \
 	} \
-	__asm__ __volatile__ ("vmovdqu %%xmm"#n", %[out];\n": [out] "=m" (*out) :: "memory"); \
-	out += BLOCKSIZE;
+	__asm__ __volatile__ ( \
+		"vmovdqu %%xmm"#n", %[out];\n" \
+		: [out] "=m" (*(out + BLOCKSIZE * n)) \
+		:: "memory"); \
 
 			STREAM_OUT(0);
 			STREAM_OUT(1);
@@ -907,19 +914,23 @@ static void aes_avx_ctr_blk8(struct aes_ctx_bitslice *ctx, struct aes_block *iv,
 		do {
 #define STREAM_OUT_XOR(n) \
 	if (unlikely(nblocks == n)) { \
-		if (unlikely(last_len > 0)) \
-			__asm__ __volatile__ ("vmovdqu %%xmm"#n", %[lastbuf];\n": [lastbuf] "=m" (*lastbuf) :: "memory"); \
+		if (likely(last_len == 0)) \
+			return; \
+		out += BLOCKSIZE * n; \
+		in += BLOCKSIZE * n; \
+		__asm__ __volatile__ ( \
+			"vmovdqu %%xmm"#n", %[lastbuf];\n" \
+			: [lastbuf] "=m" (*lastbuf) \
+			:: "memory"); \
 		break; \
 	} \
 	__asm__ __volatile__ ( \
 		"vpxor %[in], %%xmm"#n", %%xmm"#n";\n" \
 		"vmovdqu %%xmm"#n", %[out];\n" \
-		: [out] "=m" (*out) \
-		: [in] "m" (*in) \
+		: [out] "=m" (*(out + BLOCKSIZE * n)) \
+		: [in] "m" (*(in + BLOCKSIZE * n)) \
 		: "memory" \
 		); \
-	out += BLOCKSIZE; \
-	in += BLOCKSIZE;
 
 			STREAM_OUT_XOR(0);
 			STREAM_OUT_XOR(1);
