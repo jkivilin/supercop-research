@@ -138,7 +138,8 @@ do
   done
 done
 
-okabi \
+#okabi 
+echo -n "" \
 | while read abi
 do
   echo "=== `date` === building cryptopp for $abi"
@@ -201,8 +202,9 @@ do
       libs=`"oklibs-$abi"`
       libs="$lib/$abi/cpucycles.o $libs"
       [ -f "$lib/$abi/libgmp.a" ] && libs="$lib/$abi/libgmp.a $libs"
-      [ -f "$lib/$abi/libcryptopp.a" ] && libs="$lib/$abi/libcryptopp.a $libs"
+      #[ -f "$lib/$abi/libcryptopp.a" ] && libs="$lib/$abi/libcryptopp.a $libs"
       [ -f "$lib/$abi/lib${project}.a" ] && libs="$lib/$abi/lib${project}.a $libs"
+      libs="$libs -lcryptopp" # use system provided cryptopp
 
       rm -rf "$work"
       mkdir -p "$work"
