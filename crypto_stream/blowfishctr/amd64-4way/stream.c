@@ -10,7 +10,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      const unsigned char *k)
 {
 	struct blowfish_ctx ctx;
-	uint64_t iv, block;
+	uint64_t iv;
 	uint64_t ivs[4];
 
 	blowfish_init(&ctx, k, CRYPTO_KEYBYTES);
