@@ -126,25 +126,15 @@
 	rorl $1,			y ## d; \
 	orq y,				ba;
 
-.align 4
-__g1g2_3_ab_cd:
-	g1g2_3(RAB, RCD, s0, s1, s2, s3, s0, s1, s2, s3, RX, RY);
-	ret;
-
-.align 4
-__g1g2_3_ba_dc:
-	g1g2_3(RAB, RCD, s1, s2, s3, s0, s3, s0, s1, s2, RY, RX);
-	ret;
-
 #define encrypt_round3(ab, cd, n) \
-	call __g1g2_3_ab_cd; \
+	g1g2_3(RAB, RCD, s0, s1, s2, s3, s0, s1, s2, s3, RX, RY); \
 	\
 	enc_round_end(ab ## 0, RX0, RY0, n); \
 	enc_round_end(ab ## 1, RX1, RY1, n); \
 	enc_round_end(ab ## 2, RX2, RY2, n);
 
 #define decrypt_round3(ba, dc, n) \
-	call __g1g2_3_ba_dc; \
+	g1g2_3(RAB, RCD, s1, s2, s3, s0, s3, s0, s1, s2, RY, RX); \
 	\
 	dec_round_end(ba ## 0, RX0, RY0, n); \
 	dec_round_end(ba ## 1, RX1, RY1, n); \

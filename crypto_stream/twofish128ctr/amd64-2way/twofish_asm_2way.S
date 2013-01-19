@@ -164,6 +164,7 @@
 	outunpack(RIO, 0, RX, 0); \
 	outunpack(RIO, 2, RY, 2);
 
+#if 0
 .align 8
 .global asm_twofish_encrypt1
 .type   asm_twofish_encrypt1,@function;
@@ -246,6 +247,7 @@ asm_twofish_decrypt1:
 	popq RMASK
 
 	ret;
+#endif
 
 /**********************************************************************
   2-way twofish
