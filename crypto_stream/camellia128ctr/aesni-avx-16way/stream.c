@@ -7,8 +7,8 @@
 #define PARALLEL_BLOCKS 16
 #define BLOCKSIZE 16
 
-#define unlikely(x)	__builtin_expect((x),0)
-#define likely(x)	__builtin_expect(!!(x),1)
+#define unlikely(x)	(!__builtin_expect(!(x),1))
+#define likely(x)	(__builtin_expect(!!(x),1))
 
 typedef struct {
 	uint64_t ll[2];
@@ -75,10 +75,10 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 
 		inlen -= PARALLEL_BLOCKS * BLOCKSIZE;
 		out += PARALLEL_BLOCKS * BLOCKSIZE;
-		in += in ? PARALLEL_BLOCKS * BLOCKSIZE : 0;
+		in += unlikely(in) ? PARALLEL_BLOCKS * BLOCKSIZE : 0;
 	}
 
-	if (inlen > 0) {
+	if (unlikely(inlen > 0)) {
 		uint128_t buf[PARALLEL_BLOCKS];
 		unsigned int i, j;
 

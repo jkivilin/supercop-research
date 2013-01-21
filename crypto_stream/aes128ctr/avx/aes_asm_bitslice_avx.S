@@ -814,16 +814,17 @@ aes_ctr_8way:
 	call aes_avx_enc_blk8;
 
 	cmpq $0, %rdx;
-	je .Lctr_no_xor;
+	jne .Lctr_xor;
 
-	store_ctr_8way(%rdx, %rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4,
-				   %xmm5, %xmm6, %xmm7);
+	store_8way(%rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6,
+			 %xmm7);
 
 	ret;
 
 .align 8
-.Lctr_no_xor:
-	store_8way(%rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7);
+.Lctr_xor:
+	store_ctr_8way(%rdx, %rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4,
+				   %xmm5, %xmm6, %xmm7);
 
 	ret;
 

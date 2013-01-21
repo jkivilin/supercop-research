@@ -5,6 +5,9 @@
 
 #define BLOCKSIZE 8
 
+#define unlikely(x)	(!__builtin_expect(!(x),1))
+#define likely(x)	(__builtin_expect(!!(x),1))
+
 int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
@@ -16,7 +19,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	blowfish_init(&ctx, k, CRYPTO_KEYBYTES);
 	iv = __builtin_bswap64(*(uint64_t *)n); /* be => le */
 
-	while (inlen >= BLOCKSIZE * 4) {
+	while (likely(inlen >= BLOCKSIZE * 4)) {
 		ivs[0] = __builtin_bswap64(iv + 0); /* le => be */
 		ivs[1] = __builtin_bswap64(iv + 1); /* le => be */
 		ivs[2] = __builtin_bswap64(iv + 2); /* le => be */
@@ -25,7 +28,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 
 		blowfish_enc_blk4(&ctx, out, (uint8_t *)ivs);
 
-		if (in) {
+		if (unlikely(in)) {
 			((uint64_t *)out)[0] ^= ((uint64_t *)in)[0];
 			((uint64_t *)out)[1] ^= ((uint64_t *)in)[1];
 			((uint64_t *)out)[2] ^= ((uint64_t *)in)[2];
@@ -37,7 +40,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		inlen -= BLOCKSIZE * 4;
 	}
 
-	if (inlen > 0) {
+	if (unlikely(inlen > 0)) {
 		unsigned int nblock = inlen / BLOCKSIZE;
 		unsigned int lastlen = inlen % BLOCKSIZE;
 		unsigned int i, j;

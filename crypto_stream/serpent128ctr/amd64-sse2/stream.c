@@ -3,6 +3,9 @@
 #include "api.h"
 #include "serpent.h"
 
+#define unlikely(x)	(!__builtin_expect(!(x),1))
+#define likely(x)	(__builtin_expect(!!(x),1))
+
 #define BLOCKSIZE 16
 
 typedef struct {
@@ -63,7 +66,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	serpent_init(&ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
-	while (inlen >= BLOCKSIZE * 8) {
+	while (likely(inlen >= BLOCKSIZE * 8)) {
 		bswap128(&ivs[0], &iv); /* le => be */
 		add128(&ivs[1], &iv, 1);
 		bswap128(&ivs[1], &ivs[1]); /* le => be */
@@ -83,7 +86,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 
 		serpent_enc_blk8(&ctx, out, (uint8_t *)ivs);
 
-		if (in) {
+		if (unlikely(in)) {
 			xor128(&((uint128_t *)out)[0], &((uint128_t *)out)[0], &((uint128_t *)in)[0]);
 			xor128(&((uint128_t *)out)[1], &((uint128_t *)out)[1], &((uint128_t *)in)[1]);
 			xor128(&((uint128_t *)out)[2], &((uint128_t *)out)[2], &((uint128_t *)in)[2]);
@@ -99,7 +102,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		inlen -= BLOCKSIZE * 8;
 	}
 
-	if (inlen > 0) {
+	if (unlikely(inlen > 0)) {
 		unsigned int nblock = inlen / BLOCKSIZE;
 		unsigned int lastlen = inlen % BLOCKSIZE;
 		unsigned int i, j;
