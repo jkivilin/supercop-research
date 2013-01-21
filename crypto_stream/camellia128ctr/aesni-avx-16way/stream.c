@@ -7,7 +7,7 @@
 #define PARALLEL_BLOCKS 16
 #define BLOCKSIZE 16
 
-#define unlikely(x)	__builtin_expect(!!!(x),0)
+#define unlikely(x)	__builtin_expect((x),0)
 #define likely(x)	__builtin_expect(!!(x),1)
 
 typedef struct {
@@ -23,16 +23,26 @@ static inline void bswap128(uint128_t *dst, const uint128_t *src)
 	dst->ll[0] = tmp;
 }
 
-static inline void add128(uint128_t *dst, const uint128_t *src, uint64_t add)
-{
-	add += src->ll[0];
-	dst->ll[1] = src->ll[1] + (src->ll[0] > add);
-	dst->ll[0] = add;
-}
-
 static inline void inc128(uint128_t *u)
 {
-	add128(u, u, 1);
+	__asm__ (
+		"addq $1, %[ll0];\n"
+		"adcq $0, %[ll1];\n"
+		: [ll0] "=g" (u->ll[0]), [ll1] "=g" (u->ll[1])
+		: "0" (u->ll[0]), "1" (u->ll[1])
+		:
+	);
+}
+
+static inline void add128(uint128_t *dst, const uint128_t *src, uint64_t add)
+{
+	__asm__ (
+		"addq %[add], %[ll0];\n"
+		"adcq $0, %[ll1];\n"
+		: [ll0] "=g" (dst->ll[0]), [ll1] "=g" (dst->ll[1])
+		: "0" (src->ll[0]), "1" (src->ll[1]), [add] "cg" (add)
+		:
+	);
 }
 
 static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t *src2)
