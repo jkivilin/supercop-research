@@ -166,23 +166,6 @@
 	vpxor 7 * 16(mem_cd), x3, x3;
 
 /*
- * Size optimisation... with inlined roundsm16 binary would be over 5 times
- * larger and would only be 0.5% faster (on sandy-bridge).
- */
-.align 8
-roundsm16_x0_x1_x2_x3_x4_x5_x6_x7_y0_y1_y2_y3_y4_y5_y6_y7_cd:
-	roundsm16(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
-		  %xmm8, %xmm9, %xmm10, %xmm11, %xmm12, %xmm13, %xmm14, %xmm15,
-		  %rcx, (%r9));
-	ret;
-
-.align 8
-roundsm16_x4_x5_x6_x7_x0_x1_x2_x3_y4_y5_y6_y7_y0_y1_y2_y3_ab:
-	roundsm16(%xmm4, %xmm5, %xmm6, %xmm7, %xmm0, %xmm1, %xmm2, %xmm3,
-		  %xmm12, %xmm13, %xmm14, %xmm15, %xmm8, %xmm9, %xmm10, %xmm11,
-		  %rax, (%r9));
-	ret;
-/*
  * IN/OUT:
  *  x0..x7: byte-sliced AB state preloaded
  *  mem_ab: byte-sliced AB state in memory
@@ -190,10 +173,8 @@ roundsm16_x4_x5_x6_x7_x0_x1_x2_x3_y4_y5_y6_y7_y0_y1_y2_y3_ab:
  */
 #define two_roundsm16(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, \
 		      y6, y7, mem_ab, mem_cd, i, dir, store_ab) \
-	leaq (key_table + (i) * 8)(CTX), %r9; \
-	call roundsm16_x0_x1_x2_x3_x4_x5_x6_x7_y0_y1_y2_y3_y4_y5_y6_y7_cd; \
-	/*roundsm16(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, \
-		  y6, y7, mem_cd, (%r9))*/; \
+	roundsm16(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, \
+		  y6, y7, mem_cd, (key_table + (i) * 8)(CTX)); \
 	\
 	vmovdqu x4, 0 * 16(mem_cd); \
 	vmovdqu x5, 1 * 16(mem_cd); \
@@ -204,10 +185,8 @@ roundsm16_x4_x5_x6_x7_x0_x1_x2_x3_y4_y5_y6_y7_y0_y1_y2_y3_ab:
 	vmovdqu x2, 6 * 16(mem_cd); \
 	vmovdqu x3, 7 * 16(mem_cd); \
 	\
-	leaq (key_table + ((i) + (dir)) * 8)(CTX), %r9; \
-	call roundsm16_x4_x5_x6_x7_x0_x1_x2_x3_y4_y5_y6_y7_y0_y1_y2_y3_ab; \
-	/*roundsm16(x4, x5, x6, x7, x0, x1, x2, x3, y0, y1, y2, y3, y4, y5, \
-		  y6, y7, mem_ab, (%r9))*/; \
+	roundsm16(x4, x5, x6, x7, x0, x1, x2, x3, y0, y1, y2, y3, y4, y5, \
+		  y6, y7, mem_ab, (key_table + ((i) + (dir)) * 8)(CTX)); \
 	\
 	store_ab(x0, x1, x2, x3, x4, x5, x6, x7, mem_ab);
 
