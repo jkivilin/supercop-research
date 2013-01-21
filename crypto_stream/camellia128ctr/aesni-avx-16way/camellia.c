@@ -986,7 +986,7 @@ static void camellia_setup_tail(uint64_t *subkey, uint64_t *subRL, int max)
 	}
 }
 
-static __attribute__((noinline)) void camellia_setup128(const unsigned char *key, uint64_t *subkey)
+static void camellia_setup128(const unsigned char *key, uint64_t *subkey)
 {
 	uint64_t kl, kr, ww;
 	uint64_t subRL[26];
@@ -1092,7 +1092,7 @@ static __attribute__((noinline)) void camellia_setup128(const unsigned char *key
 	camellia_setup_tail(subkey, subRL, 24);
 }
 
-static __attribute__((noinline)) void camellia_setup256(const unsigned char *key, uint64_t *subkey)
+static void camellia_setup256(const unsigned char *key, uint64_t *subkey)
 {
 	uint64_t kl, kr;			/* left half of key */
 	uint64_t krl, krr;			/* right half of key */

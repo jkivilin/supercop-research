@@ -856,20 +856,18 @@ roundsm16_x4_x5_x6_x7_x0_x1_x2_x3_y4_y5_y6_y7_y0_y1_y2_y3_ab:
 .text
 
 .align 8
-.global __camellia_enc_blk16
 .type   __camellia_enc_blk16,@function;
 
 __camellia_enc_blk16:
 	/* input:
 	 *	%rdi: ctx, CTX
+	 *	%rax: temporary storage, 256 bytes
 	 *	%xmm0..%xmm15: 16 plaintext blocks
 	 * output:
 	 *	%xmm0..%xmm15: 16 encrypted blocks, order swapped:
-	 *       7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8
+	 *       7, 8, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8
 	 */
 
-	subq $(16 * 16), %rsp;
-	movq %rsp, %rax;
 	leaq 8 * 16(%rax), %rcx;
 
 	inpack16_post(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
@@ -923,7 +921,6 @@ __camellia_enc_blk16:
 		    %xmm8, %xmm9, %xmm10, %xmm11, %xmm12, %xmm13, %xmm14,
 		    %xmm15, (key_table)(CTX, %r8, 8), (%rax), 1 * 16(%rax));
 
-	addq $(16 * 16), %rsp;
 	ret;
 
 .align 8
@@ -945,25 +942,19 @@ __camellia_enc_blk16:
 	jmp .Lenc_done;
 
 .align 8
-.global __camellia_dec_blk16
 .type   __camellia_dec_blk16,@function;
 
 __camellia_dec_blk16:
 	/* input:
 	 *	%rdi: ctx, CTX
+	 *	%rax: temporary storage, 256 bytes
+	 *	%r8d: 24 for 16 byte key, 32 for larger
 	 *	%xmm0..%xmm15: 16 encrypted blocks
 	 * output:
 	 *	%xmm0..%xmm15: 16 plaintext blocks, order swapped:
-	 *       7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8
+	 *       7, 8, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8
 	 */
 
-	cmpl $16, key_length(CTX);
-	movl $32, %r8d;
-	movl $24, %eax;
-	cmovel %eax, %r8d; /* max */
-
-	subq $(16 * 16), %rsp;
-	movq %rsp, %rax;
 	leaq 8 * 16(%rax), %rcx;
 
 	inpack16_post(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
@@ -1016,7 +1007,6 @@ __camellia_dec_blk16:
 		    %xmm8, %xmm9, %xmm10, %xmm11, %xmm12, %xmm13, %xmm14,
 		    %xmm15, (key_table)(CTX), (%rax), 1 * 16(%rax));
 
-	addq $(16 * 16), %rsp;
 	ret;
 
 .align 8
@@ -1034,3 +1024,230 @@ __camellia_dec_blk16:
 	      ((key_table + (24) * 8) + 4)(CTX));
 
 	jmp .Ldec_max24;
+
+.align 8
+.global camellia_ecb_enc_16way
+.type   camellia_ecb_enc_16way,@function;
+
+camellia_ecb_enc_16way:
+	/* input:
+	 *	%rdi: ctx, CTX
+	 *	%rsi: dst (16 blocks)
+	 *	%rdx: src (16 blocks)
+	 */
+
+	inpack16_pre(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
+		     %xmm8, %xmm9, %xmm10, %xmm11, %xmm12, %xmm13, %xmm14,
+		     %xmm15, %rdx, (key_table)(CTX));
+
+	/* now dst can be used as temporary buffer (even in src == dst case) */
+	movq	%rsi, %rax;
+
+	call __camellia_enc_blk16;
+
+	write_output(%xmm7, %xmm6, %xmm5, %xmm4, %xmm3, %xmm2, %xmm1, %xmm0,
+		     %xmm15, %xmm14, %xmm13, %xmm12, %xmm11, %xmm10, %xmm9,
+		     %xmm8, %rsi);
+
+	ret;
+
+.align 8
+.global camellia_ecb_dec_16way
+.type   camellia_ecb_dec_16way,@function;
+
+camellia_ecb_dec_16way:
+	/* input:
+	 *	%rdi: ctx, CTX
+	 *	%rsi: dst (16 blocks)
+	 *	%rdx: src (16 blocks)
+	 */
+
+	cmpl $16, key_length(CTX);
+	movl $32, %r8d;
+	movl $24, %eax;
+	cmovel %eax, %r8d; /* max */
+
+	inpack16_pre(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
+		     %xmm8, %xmm9, %xmm10, %xmm11, %xmm12, %xmm13, %xmm14,
+		     %xmm15, %rdx, (key_table)(CTX, %r8, 8));
+
+	/* now dst can be used as temporary buffer (even in src == dst case) */
+	movq	%rsi, %rax;
+
+	call __camellia_dec_blk16;
+
+	write_output(%xmm7, %xmm6, %xmm5, %xmm4, %xmm3, %xmm2, %xmm1, %xmm0,
+		     %xmm15, %xmm14, %xmm13, %xmm12, %xmm11, %xmm10, %xmm9,
+		     %xmm8, %rsi);
+
+	ret;
+
+.align 8
+.global camellia_cbc_dec_16way
+.type   camellia_cbc_dec_16way,@function;
+
+camellia_cbc_dec_16way:
+	/* input:
+	 *	%rdi: ctx, CTX
+	 *	%rsi: dst (16 blocks)
+	 *	%rdx: src (16 blocks)
+	 */
+
+	cmpl $16, key_length(CTX);
+	movl $32, %r8d;
+	movl $24, %eax;
+	cmovel %eax, %r8d; /* max */
+
+	inpack16_pre(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
+		     %xmm8, %xmm9, %xmm10, %xmm11, %xmm12, %xmm13, %xmm14,
+		     %xmm15, %rdx, (key_table)(CTX, %r8, 8));
+
+	/*
+	 * dst might still be in-use (in case dst == src), so use stack for
+	 * temporary storage.
+	 */
+	subq $(16 * 16), %rsp;
+	movq %rsp, %rax;
+
+	call __camellia_dec_blk16;
+
+	addq $(16 * 16), %rsp;
+
+	vpxor (0 * 16)(%rdx), %xmm6, %xmm6;
+	vpxor (1 * 16)(%rdx), %xmm5, %xmm5;
+	vpxor (2 * 16)(%rdx), %xmm4, %xmm4;
+	vpxor (3 * 16)(%rdx), %xmm3, %xmm3;
+	vpxor (4 * 16)(%rdx), %xmm2, %xmm2;
+	vpxor (5 * 16)(%rdx), %xmm1, %xmm1;
+	vpxor (6 * 16)(%rdx), %xmm0, %xmm0;
+	vpxor (7 * 16)(%rdx), %xmm15, %xmm15;
+	vpxor (8 * 16)(%rdx), %xmm14, %xmm14;
+	vpxor (9 * 16)(%rdx), %xmm13, %xmm13;
+	vpxor (10 * 16)(%rdx), %xmm12, %xmm12;
+	vpxor (11 * 16)(%rdx), %xmm11, %xmm11;
+	vpxor (12 * 16)(%rdx), %xmm10, %xmm10;
+	vpxor (13 * 16)(%rdx), %xmm9, %xmm9;
+	vpxor (14 * 16)(%rdx), %xmm8, %xmm8;
+	write_output(%xmm7, %xmm6, %xmm5, %xmm4, %xmm3, %xmm2, %xmm1, %xmm0,
+		     %xmm15, %xmm14, %xmm13, %xmm12, %xmm11, %xmm10, %xmm9,
+		     %xmm8, %rsi);
+
+	ret;
+
+#define inc_le128(x, minus_one, tmp) \
+	vpcmpeqq minus_one, x, tmp; \
+	vpsubq minus_one, x, x; \
+	vpslldq $8, tmp, tmp; \
+	vpsubq tmp, x, x;
+
+.align 8
+.global camellia_ctr_16way
+.type   camellia_ctr_16way,@function;
+
+camellia_ctr_16way:
+	/* input:
+	 *	%rdi: ctx, CTX
+	 *	%rsi: dst (16 blocks)
+	 *	%rdx: src (16 blocks)
+	 *	%rcx: iv (little endian, 128bit)
+	 */
+
+	subq $(16 * 16), %rsp;
+	movq %rsp, %rax;
+
+	vmovdqa .Lbswap128_mask, %xmm14;
+
+	/* load IV and byteswap */
+	vmovdqu (%rcx), %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm15;
+	vmovdqu %xmm15, 15 * 16(%rax);
+
+	vpcmpeqd %xmm15, %xmm15, %xmm15;
+	vpsrldq $8, %xmm15, %xmm15; /* low: -1, high: 0 */
+
+	/* construct IVs */
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm13;
+	vmovdqu %xmm13, 14 * 16(%rax);
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm13;
+	vmovdqu %xmm13, 13 * 16(%rax);
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm12;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm11;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm10;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm9;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm8;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm7;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm6;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm5;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm4;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm3;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm2;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vpshufb %xmm14, %xmm0, %xmm1;
+	inc_le128(%xmm0, %xmm15, %xmm13);
+	vmovdqa %xmm0, %xmm13;
+	vpshufb %xmm14, %xmm0, %xmm0;
+	inc_le128(%xmm13, %xmm15, %xmm14);
+	vmovdqu %xmm13, (%rcx);
+
+	/* inpack16_pre: */
+	vmovq (key_table)(CTX), %xmm15;
+	vpshufb .Lpack_bswap, %xmm15, %xmm15;
+	vpxor %xmm0, %xmm15, %xmm0;
+	vpxor %xmm1, %xmm15, %xmm1;
+	vpxor %xmm2, %xmm15, %xmm2;
+	vpxor %xmm3, %xmm15, %xmm3;
+	vpxor %xmm4, %xmm15, %xmm4;
+	vpxor %xmm5, %xmm15, %xmm5;
+	vpxor %xmm6, %xmm15, %xmm6;
+	vpxor %xmm7, %xmm15, %xmm7;
+	vpxor %xmm8, %xmm15, %xmm8;
+	vpxor %xmm9, %xmm15, %xmm9;
+	vpxor %xmm10, %xmm15, %xmm10;
+	vpxor %xmm11, %xmm15, %xmm11;
+	vpxor %xmm12, %xmm15, %xmm12;
+	vpxor 13 * 16(%rax), %xmm15, %xmm13;
+	vpxor 14 * 16(%rax), %xmm15, %xmm14;
+	vpxor 15 * 16(%rax), %xmm15, %xmm15;
+
+	call __camellia_enc_blk16;
+
+	addq $(16 * 16), %rsp;
+
+	cmpq $0, %rdx;
+	je .Lctr_no_xor;
+
+	vpxor 0 * 16(%rdx), %xmm7, %xmm7;
+	vpxor 1 * 16(%rdx), %xmm6, %xmm6;
+	vpxor 2 * 16(%rdx), %xmm5, %xmm5;
+	vpxor 3 * 16(%rdx), %xmm4, %xmm4;
+	vpxor 4 * 16(%rdx), %xmm3, %xmm3;
+	vpxor 5 * 16(%rdx), %xmm2, %xmm2;
+	vpxor 6 * 16(%rdx), %xmm1, %xmm1;
+	vpxor 7 * 16(%rdx), %xmm0, %xmm0;
+	vpxor 8 * 16(%rdx), %xmm15, %xmm15;
+	vpxor 9 * 16(%rdx), %xmm14, %xmm14;
+	vpxor 10 * 16(%rdx), %xmm13, %xmm13;
+	vpxor 11 * 16(%rdx), %xmm12, %xmm12;
+	vpxor 12 * 16(%rdx), %xmm11, %xmm11;
+	vpxor 13 * 16(%rdx), %xmm10, %xmm10;
+	vpxor 14 * 16(%rdx), %xmm9, %xmm9;
+	vpxor 15 * 16(%rdx), %xmm8, %xmm8;
+.Lctr_no_xor:
+	write_output(%xmm7, %xmm6, %xmm5, %xmm4, %xmm3, %xmm2, %xmm1, %xmm0,
+		     %xmm15, %xmm14, %xmm13, %xmm12, %xmm11, %xmm10, %xmm9,
+		     %xmm8, %rsi);
+
+	ret;
