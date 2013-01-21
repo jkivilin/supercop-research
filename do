@@ -420,5 +420,5 @@ done
 echo "=== `date` === finishing"
 
 sed 's/^/+ /' <"$top/log" >&5
-xz -9eee "$top/data"
+gzip "$top/data"
 touch "$top/done-$version"
