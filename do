@@ -4,6 +4,9 @@
 # D. J. Bernstein
 # Public domain.
 
+limit_alg_to=""
+#limit_alg_to="serpent"
+
 version=`cat version`
 project=supercop
 shorthostname=`hostname | sed 's/\..*//' | tr -cd '[a-z][A-Z][0-9]' | tr '[A-Z]' '[a-z]'`
@@ -176,6 +179,12 @@ do
   ( ranlib "$lib/$abi/lib${project}.a" || exit 0 )
 done
 
+if [ "x$limit_alg_to" != "x" ]; then
+	filter_alg="grep $limit_alg_to"
+else
+	filter_alg="cat"
+fi
+
 # loop over operations
 cat OPERATIONS \
 | while read o macros prototypes
@@ -213,7 +222,7 @@ do
 
       # for each operation primitive abi, loop over implementations
       find "$o/$p" -follow -name "api.h" \
-      | sort \
+      | $filter_alg | sort \
       | while read doth
       do
 	implementationdir=`dirname $doth`
