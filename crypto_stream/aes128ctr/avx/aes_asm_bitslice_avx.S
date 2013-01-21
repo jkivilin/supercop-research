@@ -33,9 +33,6 @@
 
 /* registers */
 #define CTX %rdi
-#define RIN %rdx
-#define ROUT %rsi
-#define RXOR %rcx
 
 /***********************************************************************
  * 8-way AVX bitsliced AES
@@ -377,7 +374,7 @@
 	 * gf4_add(&y[0], &y[2], &y[0]); \
 	 */ \
 	/* \
-	 * note: y[0] is needed later, but are running out of registers. \
+	 * note: y[0] is needed later, but we are running out of registers. \
 	 * However y[0] can be restored with "gf4_add(&y[0], &y[2], &y[0])" \
 	 * later on. \
 	 * TODO: Investigate if using stack as temporary storage is faster. \
@@ -625,10 +622,10 @@ aes_keyshed_bitslice_avx:
 	ret;
 
 .align 8
-.global aes_avx_blk8
-.type   aes_avx_blk8,@function;
+.global aes_avx_enc_blk8
+.type   aes_avx_enc_blk8,@function;
 
-aes_avx_blk8:
+aes_avx_enc_blk8:
 	/* input:
 	 *	%rdi: ctx, CTX
 	 *	%xmm0-%xmm7: eight input/output blocks
@@ -636,15 +633,15 @@ aes_avx_blk8:
 
 	movl	nr(CTX), %eax;
 	decl	%eax;
-	leaq	bs_keysched(CTX), %rsi;
+	leaq	bs_keysched(CTX), %r8;
 
 	bitslice(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
 		 %xmm8, %xmm9);
 
 .Lenc_loop:
 	addroundkey(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
-		    %rsi);
-	addq	$(8*16), %rsi;
+		    %r8);
+	addq	$(8*16), %r8;
 
 	shiftrow(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7, %xmm8);
 
@@ -659,8 +656,8 @@ aes_avx_blk8:
 	jnz	.Lenc_loop;
 
 	addroundkey(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
-		    %rsi);
-	addq	$(8*16), %rsi;
+		    %r8);
+	addq	$(8*16), %r8;
 
 	shiftrow(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7, %xmm8);
 
@@ -668,7 +665,7 @@ aes_avx_blk8:
 		%xmm8, %xmm9, %xmm10, %xmm11, %xmm12, %xmm13, %xmm14, %xmm15);
 
 	addroundkey(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
-		    %rsi);
+		    %r8);
 
 	bitslice(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
 		 %xmm8, %xmm9);
@@ -676,37 +673,27 @@ aes_avx_blk8:
 	ret;
 
 .align 8
-.global aes_dec_avx
-.type   aes_dec_avx,@function;
+.global aes_avx_dec_blk8
+.type   aes_avx_dec_blk8,@function;
 
-aes_dec_avx:
+aes_avx_dec_blk8:
 	/* input:
 	 *	%rdi: ctx, CTX
-	 *	%rsi: dst
-	 *	%rdx: src
+	 *	%xmm0-%xmm7: eight input/output blocks
 	 */
 
-	vmovdqu 0*16(RIN), %xmm0;
-	vmovdqu 1*16(RIN), %xmm1;
-	vmovdqu 2*16(RIN), %xmm2;
-	vmovdqu 3*16(RIN), %xmm3;
-	vmovdqu 4*16(RIN), %xmm4;
-	vmovdqu 5*16(RIN), %xmm5;
-	vmovdqu 6*16(RIN), %xmm6;
-	vmovdqu 7*16(RIN), %xmm7;
-
 	movl	nr(CTX), %eax;
-	movl	%eax, %edx;
+	movl	%eax, %r8d;
 	decl	%eax;
-	shll	$7, %edx;
-	leaq	bs_keysched(CTX,%rdx,1), %rdx;
+	shll	$7, %r8d;
+	leaq	bs_keysched(CTX,%r8,1), %r8;
 
 	bitslice(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
 		 %xmm8, %xmm9);
 
 	addroundkey(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
-		    %rdx);
-	subq	$(8*16), %rdx;
+		    %r8);
+	subq	$(8*16), %r8;
 
 	subbyte_inv(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
 		    %xmm8, %xmm9, %xmm10, %xmm11,
@@ -716,8 +703,8 @@ aes_dec_avx:
 		     %xmm8);
 
 	addroundkey(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
-		    %rdx);
-	subq	$(8*16), %rdx;
+		    %r8);
+	subq	$(8*16), %r8;
 
 .Ldec_loop:
 	mixcolumns_inv(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
@@ -732,8 +719,8 @@ aes_dec_avx:
 		     %xmm8);
 
 	addroundkey(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
-		    %rdx);
-	subq	$(8*16), %rdx;
+		    %r8);
+	subq	$(8*16), %r8;
 
 	decl	%eax;
 	jnz	.Ldec_loop;
@@ -741,14 +728,102 @@ aes_dec_avx:
 	bitslice(%xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7,
 		 %xmm8, %xmm9);
 
-	vmovdqu %xmm0, 0*16(ROUT);
-	vmovdqu %xmm1, 1*16(ROUT);
-	vmovdqu %xmm2, 2*16(ROUT);
-	vmovdqu %xmm3, 3*16(ROUT);
-	vmovdqu %xmm4, 4*16(ROUT);
-	vmovdqu %xmm5, 5*16(ROUT);
-	vmovdqu %xmm6, 6*16(ROUT);
-	vmovdqu %xmm7, 7*16(ROUT);
+	ret;
+
+#define load_8way(src, x0, x1, x2, x3, x4, x5, x6, x7) \
+	vmovdqu (0*16)(src), x0; \
+	vmovdqu (1*16)(src), x1; \
+	vmovdqu (2*16)(src), x2; \
+	vmovdqu (3*16)(src), x3; \
+	vmovdqu (4*16)(src), x4; \
+	vmovdqu (5*16)(src), x5; \
+	vmovdqu (6*16)(src), x6; \
+	vmovdqu (7*16)(src), x7;
+
+#define store_8way(dst, x0, x1, x2, x3, x4, x5, x6, x7) \
+	vmovdqu x0, (0*16)(dst); \
+	vmovdqu x1, (1*16)(dst); \
+	vmovdqu x2, (2*16)(dst); \
+	vmovdqu x3, (3*16)(dst); \
+	vmovdqu x4, (4*16)(dst); \
+	vmovdqu x5, (5*16)(dst); \
+	vmovdqu x6, (6*16)(dst); \
+	vmovdqu x7, (7*16)(dst);
+
+#define inc_le128(x, minus_one, tmp) \
+	vpcmpeqq minus_one, x, tmp; \
+	vpsubq minus_one, x, x; \
+	vpslldq $8, tmp, tmp; \
+	vpsubq tmp, x, x;
+
+#define load_ctr_8way(iv, bswap, x0, x1, x2, x3, x4, x5, x6, x7, t0, t1, t2) \
+	vpcmpeqd t0, t0, t0; \
+	vpsrldq $8, t0, t0; /* low: -1, high: 0 */ \
+	vmovdqa bswap, t1; \
+	\
+	/* load IV and byteswap */ \
+	vmovdqu (iv), x7; \
+	vpshufb t1, x7, x0; \
+	\
+	/* construct IVs */ \
+	inc_le128(x7, t0, t2); \
+	vpshufb t1, x7, x1; \
+	inc_le128(x7, t0, t2); \
+	vpshufb t1, x7, x2; \
+	inc_le128(x7, t0, t2); \
+	vpshufb t1, x7, x3; \
+	inc_le128(x7, t0, t2); \
+	vpshufb t1, x7, x4; \
+	inc_le128(x7, t0, t2); \
+	vpshufb t1, x7, x5; \
+	inc_le128(x7, t0, t2); \
+	vpshufb t1, x7, x6; \
+	inc_le128(x7, t0, t2); \
+	vmovdqa x7, t2; \
+	vpshufb t1, x7, x7; \
+	inc_le128(t2, t0, t1); \
+	vmovdqu t2, (iv);
+
+#define store_ctr_8way(src, dst, x0, x1, x2, x3, x4, x5, x6, x7) \
+	vpxor (0*16)(src), x0, x0; \
+	vpxor (1*16)(src), x1, x1; \
+	vpxor (2*16)(src), x2, x2; \
+	vpxor (3*16)(src), x3, x3; \
+	vpxor (4*16)(src), x4, x4; \
+	vpxor (5*16)(src), x5, x5; \
+	vpxor (6*16)(src), x6, x6; \
+	vpxor (7*16)(src), x7, x7; \
+	store_8way(dst, x0, x1, x2, x3, x4, x5, x6, x7);
+
+.align 8
+.global aes_ctr_8way
+.type   aes_ctr_8way,@function;
+
+aes_ctr_8way:
+	/* input:
+	 *	%rdi: ctx, CTX
+	 *	%rsi: dst
+	 *	%rdx: src
+	 *	%rcx: iv (little endian, 128bit)
+	 */
+
+	load_ctr_8way(%rcx, .Lbswap128_mask, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4,
+					     %xmm5, %xmm6, %xmm7, %xmm8, %xmm9,
+					     %xmm10);
+
+	call aes_avx_enc_blk8;
+
+	cmpq $0, %rdx;
+	je .Lctr_no_xor;
+
+	store_ctr_8way(%rdx, %rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4,
+				   %xmm5, %xmm6, %xmm7);
+
+	ret;
+
+.align 8
+.Lctr_no_xor:
+	store_8way(%rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6, %xmm7);
 
 	ret;
 
