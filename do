@@ -5,7 +5,7 @@
 # Public domain.
 
 limit_alg_to=""
-#limit_alg_to="serpent"
+#limit_alg_to="camellia"
 
 version=`cat version`
 project=supercop
@@ -214,6 +214,7 @@ do
       #[ -f "$lib/$abi/libcryptopp.a" ] && libs="$lib/$abi/libcryptopp.a $libs"
       [ -f "$lib/$abi/lib${project}.a" ] && libs="$lib/$abi/lib${project}.a $libs"
       libs="$libs -lcryptopp" # use system provided cryptopp
+      libs="$libs -lcrypto" # use system provided openssl/crypto
 
       rm -rf "$work"
       mkdir -p "$work"
