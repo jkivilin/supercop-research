@@ -165,7 +165,7 @@ do
           libs="$top/$abi/lib/cpucycles.o $libs"
 	  if $compiler -D'COMPILER="'"$compiler"'"' \
             -DLOOPS=1 \
-            -I. -I"$top/$abi/include" \
+            $botaninc -I. -I"$top/$abi/include" \
             -o measure measure.$language measure-anything.$language \
 	    $libs
 	  then
@@ -325,6 +325,9 @@ do
           [ -f "$top/$abi/lib/libcryptopp.a" ] && libs="$top/$abi/lib/libcryptopp.a $libs"
 	fi
         [ -f "$top/$abi/lib/lib${project}.a" ] && libs="$top/$abi/lib/lib${project}.a $libs"
+        libs="$libs -lcryptopp" # use system provided cryptopp
+        libs="$libs -lcrypto" # use system provided openssl/crypto
+        libs="$libs -lbotan-1.10" # use system provided botan
   
         mkdir -p "$top/$target/work"
         cp -pr "$implementationdir"/* "$top/$target/work"
@@ -394,7 +397,7 @@ do
 	      (
                 killafter 300 \
 		$compiler \
-                  -I. -I"$top/$abi/include" \
+                  $botaninc -I. -I"$top/$abi/include" \
                   -c "$f" 2>&1 || rm -f OK
 	      ) | awk -v PREFIX="$version $shorthostname $abi $startdate $o $p fromcompiler $implementationdir $compilerword $f" '
 	        {
@@ -412,7 +415,7 @@ do
 	  (
             killafter 300 \
             $compiler \
-              -I. -I"$top/$abi/include" \
+              $botaninc -I. -I"$top/$abi/include" \
               -o try try.$language try-anything.$language \
               "$op.a" $libs 2>&1 || rm -f OK
 	  ) | awk -v PREFIX="$version $shorthostname $abi $startdate $o $p fromcompiler $implementationdir $compilerword try.$language" '
@@ -450,7 +453,7 @@ do
             killafter 3600 \
             $compiler -D'COMPILER="'"$compiler"'"' \
               -DSUPERCOP -DLOOPS=1 \
-              -I. -I"$top/$abi/include" \
+              $botaninc -I. -I"$top/$abi/include" \
               -o measure measure.$language measure-anything.$language \
               "$op.a" $libs 2>&1 || rm -f OK
 	  ) | awk -v PREFIX="$version $shorthostname $abi $startdate $o $p fromcompiler $implementationdir $compilerword measure.$language" '

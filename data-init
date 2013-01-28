@@ -64,23 +64,23 @@ do
   : > "$top/$abi/base/dep"
   echo "$abi/base" >&6
 
-  mkdir -p "$top/$abi/cryptopp"
-  touch "$top/$abi/cryptopp/BUILD"
-  touch "$top/$abi/cryptopp/LOCK"
-  : > "$top/$abi/cryptopp/dep"
-  echo "$abi/cryptopp" >&6
+#  mkdir -p "$top/$abi/cryptopp"
+#  touch "$top/$abi/cryptopp/BUILD"
+#  touch "$top/$abi/cryptopp/LOCK"
+#  : > "$top/$abi/cryptopp/dep"
+#  echo "$abi/cryptopp" >&6
 
-  mkdir -p "$top/$abi/openssl"
-  touch "$top/$abi/openssl/BUILD"
-  touch "$top/$abi/openssl/LOCK"
-  : > "$top/$abi/openssl/dep"
-  echo "$abi/openssl" >&6
+#  mkdir -p "$top/$abi/openssl"
+#  touch "$top/$abi/openssl/BUILD"
+#  touch "$top/$abi/openssl/LOCK"
+#  : > "$top/$abi/openssl/dep"
+#  echo "$abi/openssl" >&6
 
-  mkdir -p "$top/$abi/gmp"
-  touch "$top/$abi/gmp/BUILD"
-  touch "$top/$abi/gmp/LOCK"
-  : > "$top/$abi/gmp/dep"
-  echo "$abi/gmp" >&6
+#  mkdir -p "$top/$abi/gmp"
+#  touch "$top/$abi/gmp/BUILD"
+#  touch "$top/$abi/gmp/LOCK"
+#  : > "$top/$abi/gmp/dep"
+#  echo "$abi/gmp" >&6
 done
 
 
@@ -220,15 +220,15 @@ do
         | while read incl
         do
           case "$incl" in
-            openssl*)
-	      echo openssl
-              ;;
-            cryptopp*)
-	      echo cryptopp
-              ;;
-            gmp*)
-              echo gmp
-              ;;
+#            openssl*)
+#	      echo openssl
+#              ;;
+#            cryptopp*)
+#	      echo cryptopp
+#              ;;
+#            gmp*)
+#              echo gmp
+#              ;;
             crypto_*_*)
               op=`echo "$incl" | sed 's/_\(.*\)_/_\1\//'`
 	      if [ -d "$top/$abi/integrate/$op" ]
