@@ -6,6 +6,10 @@
 
 . ./data-vars
 
+pipe_comment() {
+	cat -
+}
+
 exec <"$top/todo"
 exec >/dev/null
 exec 2>/dev/null
@@ -475,6 +479,13 @@ do
           cp -p "$op.h" "../compiled/$op.h"
           cp -p "$o.h" "../compiled/$o.h"
           cp -p measure ../compiled/measure
+
+          ### do measurement here, so that all implementation are run
+          "../compiled/measure" \
+          | while read measurement
+          do
+            echo "$version $shorthostname $abi $startdate $o $p $measurement" >&5
+          done
         )
       done
     fi
