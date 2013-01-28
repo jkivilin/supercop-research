@@ -481,10 +481,13 @@ do
           cp -p measure ../compiled/measure
 
           ### do measurement here, so that all implementation are run
-          "../compiled/measure" \
-          | while read measurement
-          do
-            echo "$version $shorthostname $abi $startdate $o $p $measurement" >&5
+          for a in $(seq 1 3)
+	  do
+            "../compiled/measure" \
+            | while read measurement
+            do
+              echo "$version $shorthostname $abi $startdate $o $p $measurement" >&5
+            done
           done
         )
       done
