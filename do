@@ -5,7 +5,7 @@
 # Public domain.
 
 limit_alg_to=""
-limit_alg_to="twofish"
+limit_alg_to="serpent"
 
 version=`cat version`
 project=supercop
