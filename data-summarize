@@ -56,7 +56,7 @@
     done
   done 
   sed 's/^/+ /' < "$top/log"
-) | gzip -9 > "$top/data.gz.tmp"
+) | gzip -9 --rsyncable > "$top/data.gz.tmp"
 
 mv "$top/data.gz.tmp" "$top/data.gz"
 touch "$top/done-$version"
