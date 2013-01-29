@@ -11,8 +11,6 @@ shorthostname=`hostname | sed 's/\..*//' | tr -cd '[a-z][A-Z][0-9]' | tr '[A-Z]'
 
 top="`pwd`/supercop-data/$shorthostname"
 
-botaninc="-I/usr/include/botan-1.10"
-
 PATH="/usr/local/bin:$PATH"
 PATH="/usr/sfw/bin:$PATH"
 PATH="$top/scripts:$PATH"

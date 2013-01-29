@@ -148,7 +148,7 @@ do
         language=$t2
         compilerword=$t3
         compiler=`echo "$compilerword" | tr '_' ' '`
-  
+
         rm -rf "$top/$target/work"
         mkdir -p "$top/$target/work"
         cp -p "measure-anything.c" "$top/$target/work/measure-anything.$language"
@@ -162,14 +162,14 @@ do
           echo 'void allocate(void) { }'
           echo 'void measure(void) { }'
         ) > "$top/$target/work/measure.$language"
-  
+
         (
           cd "$top/$target/work"
           libs=`"oklibs-$abi"`
           libs="$top/$abi/lib/cpucycles.o $libs"
 	  if $compiler -D'COMPILER="'"$compiler"'"' \
             -DLOOPS=1 \
-            $botaninc -I. -I"$top/$abi/include" \
+            -I. -I"$top/$abi/include" \
             -o measure measure.$language measure-anything.$language \
 	    $libs
 	  then
@@ -314,10 +314,10 @@ do
         op="${o}_${p}"
         implementationdir="${o}/${p}/${t6}"
         opi=`echo "$implementationdir" | tr ./- ___`
-  
+
         expectedchecksum=''
         [ -f "$o/$p/checksum" ] && expectedchecksum=`cat "$o/$p/checksum"`
-  
+
         libs=`"oklibs-$abi"`
         libs="$top/$abi/lib/cpucycles.o $libs"
 	if grep '^gmp$' "$top/$abi/implementation/$implementationdir/dep" >/dev/null
@@ -331,16 +331,15 @@ do
         [ -f "$top/$abi/lib/lib${project}.a" ] && libs="$top/$abi/lib/lib${project}.a $libs"
         libs="$libs -lcryptopp" # use system provided cryptopp
         libs="$libs -lcrypto" # use system provided openssl/crypto
-        libs="$libs -lbotan-1.10" # use system provided botan
-  
+
         mkdir -p "$top/$target/work"
         cp -pr "$implementationdir"/* "$top/$target/work"
-  
+
         cfiles=`ls "$top/$target/work" | grep '\.c$' || :`
         sfiles=`ls "$top/$target/work" | grep '\.[sS]$' || :`
         ccfiles=`ls "$top/$target/work" | grep '\.cc$' || :`
         cppfiles=`ls "$top/$target/work" | grep '\.cpp$' || :`
-  
+
         cp -p "$o/try.c" "$top/$target/work/try.$language"
         cp -p "$o/measure.c" "$top/$target/work/measure.$language"
         cp -p "try-anything.c" "$top/$target/work/try-anything.$language"
@@ -392,7 +391,7 @@ do
             echo ""
             echo "#endif"
           ) > "$op.h"
-  
+
 	  touch OK
           for f in $cfiles $sfiles $ccfiles $cppfiles
           do
@@ -401,7 +400,7 @@ do
 	      (
                 killafter 300 \
 		$compiler \
-                  $botaninc -I. -I"$top/$abi/include" \
+                  -I. -I"$top/$abi/include" \
                   -c "$f" 2>&1 || rm -f OK
 	      ) | awk -v PREFIX="$version $shorthostname $abi $startdate $o $p fromcompiler $implementationdir $compilerword $f" '
 	        {
@@ -411,15 +410,15 @@ do
 	      ' >&5
             fi
           done
-  
+
           [ -f OK ] || exit 0
           okar-$abi cr "$op.a" *.o || exit 0
           ( ranlib "$op.a" || : )
-  
+
 	  (
             killafter 300 \
             $compiler \
-              $botaninc -I. -I"$top/$abi/include" \
+              -I. -I"$top/$abi/include" \
               -o try try.$language try-anything.$language \
               "$op.a" $libs 2>&1 || rm -f OK
 	  ) | awk -v PREFIX="$version $shorthostname $abi $startdate $o $p fromcompiler $implementationdir $compilerword try.$language" '
@@ -446,18 +445,18 @@ do
             done
             exit 0
           fi
-  
+
           checksumok=fails
           [ "x$expectedchecksum" = "x$checksum" ] && checksumok=ok
           [ "x$expectedchecksum" = "x" ] && checksumok=unknown
           echo "$version $shorthostname $abi $startdate $o $p try $checksum $checksumok $cycles $checksumcycles $cyclespersecond $impl $compilerword" >&5
           [ "$checksumok" = fails ] && exit 0
-  
+
 	  (
             killafter 3600 \
             $compiler -D'COMPILER="'"$compiler"'"' \
               -DSUPERCOP -DLOOPS=1 \
-              $botaninc -I. -I"$top/$abi/include" \
+              -I. -I"$top/$abi/include" \
               -o measure measure.$language measure-anything.$language \
               "$op.a" $libs 2>&1 || rm -f OK
 	  ) | awk -v PREFIX="$version $shorthostname $abi $startdate $o $p fromcompiler $implementationdir $compilerword measure.$language" '
@@ -470,7 +469,7 @@ do
 
 	  rm -rf ../compiled || exit 0
 	  mkdir ../compiled || exit 0
-  
+
 	  echo "$cycles" > ../CYCLES
           for f in *.o
           do

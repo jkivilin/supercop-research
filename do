@@ -17,8 +17,6 @@ lib="$top/lib"
 include="$top/include"
 work="$top/work"
 
-botaninc="-I/usr/include/botan-1.10"
-
 PATH="/usr/local/bin:$PATH"
 PATH="/usr/sfw/bin:$PATH"
 PATH="$bin:$PATH"
@@ -217,7 +215,6 @@ do
       [ -f "$lib/$abi/lib${project}.a" ] && libs="$lib/$abi/lib${project}.a $libs"
       libs="$libs -lcryptopp" # use system provided cryptopp
       libs="$libs -lcrypto" # use system provided openssl/crypto
-      libs="$libs -lbotan-1.10" # use system provided botan
 
       rm -rf "$work"
       mkdir -p "$work"
@@ -321,7 +318,7 @@ do
 	      if [ "$ok" = 1 ]
 	      then
 		$compiler \
-		  $botaninc -I. -I"$include" -I"$include/$abi" \
+		  -I. -I"$include" -I"$include/$abi" \
 		  -c "$f" >../errors 2>&1 || ok=0
 		( if [ `wc -l < ../errors` -lt 25 ]
 		  then
@@ -345,7 +342,7 @@ do
 
 	    killafter 300 \
 	    $compiler \
-	      $botaninc -I. -I"$include" -I"$include/$abi" \
+	      -I. -I"$include" -I"$include/$abi" \
 	      -o try try.$language try-anything.$language \
 	      "$op.a" $libs >../errors 2>&1 || ok=0
 	    cat ../errors \
@@ -383,7 +380,7 @@ do
 	    killafter 3600 \
 	    $compiler -D'COMPILER="'"$compiler"'"' \
 	      -DSUPERCOP -DLOOPS=3 \
-	      $botaninc -I. -I"$include" -I"$include/$abi" \
+	      -I. -I"$include" -I"$include/$abi" \
 	      -o measure measure.$language measure-anything.$language \
 	      "$op.a" $libs >../errors 2>&1 || ok=0
 	    cat ../errors \
@@ -392,7 +389,7 @@ do
 	      echo "$version $shorthostname $abi $startdate $o $p fromcompiler $implementationdir $compilerword measure.$language $err" >&5
 	    done
 	    [ "$ok" = 1 ] || continue
-  
+
 	    for b in best bestc
 	    do
 	      [ $language = cpp ] && [ $b = bestc ] && continue
