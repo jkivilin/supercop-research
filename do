@@ -5,7 +5,7 @@
 # Public domain.
 
 limit_alg_to=""
-limit_alg_to="aes128estream"
+limit_alg_to="aes128ctr"
 
 version=`cat version`
 project=supercop
