@@ -6,6 +6,8 @@
 
 . ./data-vars
 
+measurement_repetitions=5
+
 pipe_comment() {
 	cat -
 }
@@ -480,7 +482,7 @@ do
           cp -p measure ../compiled/measure
 
           ### do measurement here, so that all implementation are run
-          for a in $(seq 1 3)
+          for a in $(seq 1 $measurement_repetitions)
 	  do
             "../compiled/measure" \
             | while read measurement
