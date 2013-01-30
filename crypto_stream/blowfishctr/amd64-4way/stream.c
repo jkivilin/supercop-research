@@ -12,11 +12,12 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
 {
-	struct blowfish_ctx ctx;
+	char ctrbuf[sizeof(struct blowfish_ctx) + 16];
+	struct blowfish_ctx *ctx = (void *)((unsigned long)ctrbuf & ~0xfULL);
 	uint64_t iv;
 	uint64_t ivs[4];
 
-	blowfish_init(&ctx, k, CRYPTO_KEYBYTES);
+	blowfish_init(ctx, k, CRYPTO_KEYBYTES);
 	iv = __builtin_bswap64(*(uint64_t *)n); /* be => le */
 
 	while (likely(inlen >= BLOCKSIZE * 4)) {
@@ -26,7 +27,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		ivs[3] = __builtin_bswap64(iv + 3); /* le => be */
 		iv += 4;
 
-		blowfish_enc_blk4(&ctx, out, (uint8_t *)ivs);
+		blowfish_enc_blk4(ctx, out, (uint8_t *)ivs);
 
 		if (unlikely(in)) {
 			((uint64_t *)out)[0] ^= ((uint64_t *)in)[0];
@@ -50,7 +51,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		for (; i < 4; i++)
 			ivs[i] = 0;
 
-		blowfish_enc_blk4(&ctx, (uint8_t *)ivs, (uint8_t *)ivs);
+		blowfish_enc_blk4(ctx, (uint8_t *)ivs, (uint8_t *)ivs);
 
 		if (in) {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {

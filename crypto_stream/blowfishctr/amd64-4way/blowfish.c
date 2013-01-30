@@ -214,14 +214,14 @@ void blowfish_init(struct blowfish_ctx *ctx, const uint8_t *key, unsigned int ke
 	datalr = u32swap64(__builtin_bswap64(0));
 
 	for (i = 0; i < 16 + 2; i += 2) {
-		datalr = blowfish_enc_blk(ctx, datalr);
+		blowfish_enc_blk(ctx, &datalr, &datalr);
 
 		*(uint64_t *)(&ctx->p[i]) = u32swap64(__builtin_bswap64(datalr));
 	}
 
 	for (i = 0; i < 4; ++i) {
 		for (j = 0; j < 256; j += 2) {
-			datalr = blowfish_enc_blk(ctx, datalr);
+			blowfish_enc_blk(ctx, &datalr, &datalr);
 
 			*(uint64_t *)(&ctx->s[i][j]) = u32swap64(__builtin_bswap64(datalr));
 		}

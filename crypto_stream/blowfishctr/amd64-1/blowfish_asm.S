@@ -85,12 +85,13 @@
 	F();
 
 #define read_block() \
-	movq %rsi, 		RX0; \
+	movq (RIO), 		RX0; \
 	rorq $32, 		RX0; \
 	bswapq 			RX0;
 
 #define write_block() \
-	bswapq 			RX0; /* RX0 == %eax */
+	bswapq 			RX0; \
+	movq RX0, 		(RIO);
 
 .align 8
 .global blowfish_enc_blk
@@ -99,11 +100,14 @@
 blowfish_enc_blk:
 	/* input:
 	 *	%rdi: ctx, CTX
-	 *	%rsi: plaintext block
-	 * output:
-	 *      %rax: ciphertext block
+	 *	%rsi: dst
+	 *	%rdx: src
+	 *	%rcx: bool, if true: xor output
 	 */
 	movq %rbp, %r11;
+
+	movq %rsi, %r10;
+	movq %rdx, RIO;
 
 	read_block();
 
@@ -119,7 +123,9 @@ blowfish_enc_blk:
 
 	movq %r11, %rbp;
 
+	movq %r10, RIO;
 	write_block();
+
 	ret;
 
 .align 8

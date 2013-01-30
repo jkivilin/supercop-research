@@ -12,17 +12,18 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
 {
-	struct blowfish_ctx ctx;
+	char ctrbuf[sizeof(struct blowfish_ctx) + 16];
+	struct blowfish_ctx *ctx = (void *)((unsigned long)ctrbuf & ~0xfULL);
 	uint64_t iv;
 	uint64_t block;
 
-	blowfish_init(&ctx, k, CRYPTO_KEYBYTES);
+	blowfish_init(ctx, k, CRYPTO_KEYBYTES);
 	iv = __builtin_bswap64(*(uint64_t *)n); /* be => le */
 
 	while (likely(inlen > 0)) {
 		block = __builtin_bswap64(iv++); /* le => be */
 
-		block = blowfish_enc_blk(&ctx, block);
+		blowfish_enc_blk(ctx, &block, &block);
 		if (unlikely(inlen < BLOCKSIZE))
 			break;
 

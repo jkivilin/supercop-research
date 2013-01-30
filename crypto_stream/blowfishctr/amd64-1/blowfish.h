@@ -6,5 +6,5 @@ struct blowfish_ctx {
 };
 
 extern void blowfish_init(struct blowfish_ctx *ctx, const uint8_t *key, unsigned int keybytes);
-extern uint64_t blowfish_enc_blk(const struct blowfish_ctx *ctx, uint64_t block);
-extern uint64_t blowfish_dec_blk(const struct blowfish_ctx *ctx, uint64_t block);
+extern void blowfish_enc_blk(const struct blowfish_ctx *ctx, void *out, const void *in);
+extern void blowfish_dec_blk(const struct blowfish_ctx *ctx, void *out, const void *in);
