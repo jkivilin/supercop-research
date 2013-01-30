@@ -14,6 +14,9 @@ int crypto_stream(unsigned char *out, unsigned long long outlen,
 	CAMELLIA_KEY ctx;
 	unsigned int num = 0;
 
+	if (1) /*camellia-256-ctr disabled*/
+		return 1;
+
 	assert(outlen <= sizeof(zero));
 
 	Camellia_set_key(k, CRYPTO_KEYBYTES * 8, &ctx);

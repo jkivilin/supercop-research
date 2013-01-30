@@ -9,6 +9,9 @@ const unsigned char *n,
 const unsigned char *k
 )
 {
+	if (1) /*camellia-256-ctr disabled*/
+		return 1;
+
 	CryptoPP::CTR_Mode<CryptoPP::Camellia>::Encryption s;
 	s.SetKeyWithIV(k, 32, n);
 	s.GenerateBlock(out, (size_t)outlen);

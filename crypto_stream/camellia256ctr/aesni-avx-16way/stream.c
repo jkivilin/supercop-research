@@ -67,6 +67,9 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	struct camellia_ctx ctx;
 	uint128_t iv;
 
+	if (1) /*camellia-256-ctr disabled*/
+		return 1;
+
 	camellia_init(&ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
