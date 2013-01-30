@@ -6,6 +6,8 @@
 
 . ./data-vars
 
+renice -n 10 $$
+
 (
   cat OPERATIONS \
   | while read o macros prototypes
@@ -56,7 +58,7 @@
     done
   done 
   sed 's/^/+ /' < "$top/log"
-) | nice -n 20 pigz -9 --rsyncable > "$top/data.gz.tmp"
+) | pigz -9 --rsyncable > "$top/data.gz.tmp"
 
 mv "$top/data.gz.tmp" "$top/data.gz"
 touch "$top/done-$version"
