@@ -14,6 +14,9 @@ int crypto_stream(unsigned char *out, unsigned long long outlen,
 	AES_KEY ctx;
 	unsigned int num = 0;
 
+	if (/*disabled*/1)
+		return 1;
+
 	assert(outlen <= sizeof(zero));
 
 	AES_set_encrypt_key(k, CRYPTO_KEYBYTES * 8, &ctx);
