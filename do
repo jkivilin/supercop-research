@@ -430,5 +430,5 @@ done
 echo "=== `date` === finishing"
 
 sed 's/^/+ /' <"$top/log" >&5
-gzip -9 --rsyncable "$top/data"
+pigz -9 --rsyncable "$top/data"
 touch "$top/done-$version"
