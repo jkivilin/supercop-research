@@ -48,9 +48,9 @@ static inline void add128(uint128_t *dst, const uint128_t *src, uint64_t add)
 static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t *src2)
 {
 	__asm__ (
-		"movdqu %[s1], %%xmm0;\n"
-		"pxor %[s2], %%xmm0;\n"
-		"movdqu %%xmm0, %[d];\n"
+		"vmovdqu %[s1], %%xmm0;\n"
+		"vpxor %[s2], %%xmm0, %%xmm0;\n"
+		"vmovdqu %%xmm0, %[d];\n"
 		: [d] "=m" (*dst)
 		: [s1] "m" (*src1), [s2] "m" (*src2)
 		: "xmm0", "memory"
@@ -58,8 +58,8 @@ static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t
 }
 
 #define move128(dst, src) ({ \
-	__asm__ ("movdqu %[s], %%xmm0;\n" \
-		 "movdqu %%xmm0, %[d];\n" \
+	__asm__ ("vmovdqu %[s], %%xmm0;\n" \
+		 "vmovdqu %%xmm0, %[d];\n" \
 		 : [d] "=m" (*(dst)) \
 		 : [s] "m" (*(src)) \
 		 : "xmm0", "memory" \
