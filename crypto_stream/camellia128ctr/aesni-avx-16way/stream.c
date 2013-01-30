@@ -64,14 +64,15 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
 {
-	struct camellia_ctx ctx;
+	char ctrbuf[sizeof(struct camellia_ctx) + 16];
+	struct camellia_ctx *ctx = (void *)((unsigned long)ctrbuf & ~0xfULL);
 	uint128_t iv;
 
-	camellia_init(&ctx, k, CRYPTO_KEYBYTES);
+	camellia_init(ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
 	while (likely(inlen >= PARALLEL_BLOCKS * BLOCKSIZE)) {
-		camellia_ctr_16way(&ctx, out, in, &iv);
+		camellia_ctr_16way(ctx, out, in, &iv);
 
 		inlen -= PARALLEL_BLOCKS * BLOCKSIZE;
 		out += PARALLEL_BLOCKS * BLOCKSIZE;
@@ -82,7 +83,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		uint128_t buf[PARALLEL_BLOCKS];
 		unsigned int i, j;
 
-		camellia_ctr_16way(&ctx, buf, NULL, &iv);
+		camellia_ctr_16way(ctx, buf, NULL, &iv);
 
 		if (in) {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {

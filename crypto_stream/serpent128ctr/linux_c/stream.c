@@ -53,18 +53,19 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
 {
-	struct serpent_ctx ctx;
+	char ctrbuf[sizeof(struct serpent_ctx) + 16];
+	struct serpent_ctx *ctx = (void *)((unsigned long)ctrbuf & ~0xfULL);
 	uint128_t iv;
 	uint128_t ivs[1];
 
-	serpent_init(&ctx, k, CRYPTO_KEYBYTES);
+	serpent_init(ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
 	while (likely(inlen >= BLOCKSIZE)) {
 		bswap128(&ivs[0], &iv); /* le => be */
 		add128(&iv, &iv, 1);
 
-		serpent_encrypt(&ctx, out, (uint8_t *)ivs);
+		serpent_encrypt(ctx, out, (uint8_t *)ivs);
 
 		if (unlikely(in)) {
 			xor128(&((uint128_t *)out)[0], &((uint128_t *)out)[0], &((uint128_t *)in)[0]);
@@ -80,7 +81,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 
 		bswap128(&ivs[0], &iv); /* le => be */
 
-		serpent_encrypt(&ctx, (uint8_t *)ivs, (uint8_t *)ivs);
+		serpent_encrypt(ctx, (uint8_t *)ivs, (uint8_t *)ivs);
 
 		if (in) {
 			for (j = 0; j < inlen; j++)

@@ -42,14 +42,15 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
 {
-	struct aes_ctx_bitslice ctx;
+	char ctrbuf[sizeof(struct aes_ctx_bitslice) + 16];
+	struct aes_ctx_bitslice *ctx = (void *)((unsigned long)ctrbuf & ~0xfULL);
 	uint128_t iv;
 
-	aes_init_bitslice(&ctx, k, CRYPTO_KEYBYTES);
+	aes_init_bitslice(ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
 	while (likely(inlen >= PARALLEL_BLOCKS * BLOCKSIZE)) {
-		aes_ctr_8way(&ctx, out, in, &iv);
+		aes_ctr_8way(ctx, out, in, &iv);
 
 		inlen -= PARALLEL_BLOCKS * BLOCKSIZE;
 		out += PARALLEL_BLOCKS * BLOCKSIZE;
@@ -60,7 +61,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		uint128_t buf[PARALLEL_BLOCKS];
 		unsigned int i, j;
 
-		aes_ctr_8way(&ctx, buf, NULL, &iv);
+		aes_ctr_8way(ctx, buf, NULL, &iv);
 
 		if (in) {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {

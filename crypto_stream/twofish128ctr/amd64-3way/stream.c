@@ -53,11 +53,12 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
 {
-	struct twofish_ctx ctx;
+	char ctrbuf[sizeof(struct twofish_ctx) + 16];
+	struct twofish_ctx *ctx = (void *)((unsigned long)ctrbuf & ~0xfULL);
 	uint128_t iv;
 	uint128_t ivs[3];
 
-	twofish_init(&ctx, k, CRYPTO_KEYBYTES);
+	twofish_init(ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
 	while (likely(inlen >= BLOCKSIZE * 3)) {
@@ -68,7 +69,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		bswap128(&ivs[2], &ivs[2]); /* le => be */
 		add128(&iv, &iv, 3);
 
-		twofish_enc_blk3(&ctx, out, (uint8_t *)ivs);
+		twofish_enc_blk3(ctx, out, (uint8_t *)ivs);
 
 		if (unlikely(in)) {
 			xor128(&((uint128_t *)out)[0], &((uint128_t *)out)[0], &((uint128_t *)in)[0]);
@@ -95,7 +96,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 			ivs[i].ll[1] = 0;
 		}
 
-		twofish_enc_blk3(&ctx, (uint8_t *)ivs, (uint8_t *)ivs);
+		twofish_enc_blk3(ctx, (uint8_t *)ivs, (uint8_t *)ivs);
 
 		if (in) {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {
