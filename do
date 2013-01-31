@@ -5,7 +5,7 @@
 # Public domain.
 
 limit_alg_to=""
-limit_alg_to="serpent128ctr"
+limit_alg_to="blowfishctr"
 
 version=`cat version`
 project=supercop
