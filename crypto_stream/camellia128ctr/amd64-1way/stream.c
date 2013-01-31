@@ -53,8 +53,11 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
 {
-	char ctrbuf[sizeof(struct camellia_ctx) + 16];
-	struct camellia_ctx *ctx = (void *)((unsigned long)ctrbuf & ~0xfULL);
+#define CTX_TYPE struct camellia_ctx
+#define PTR_ALIGN(ptr, mask) ((void *)((((long)(ptr)) + (mask)) & ~((long)(mask))))
+	const unsigned long align = 16;
+	char ctxbuf[sizeof(CTX_TYPE) + align];
+	CTX_TYPE *ctx = PTR_ALIGN(ctxbuf, align - 1);
 	uint128_t iv;
 	uint128_t ivs[1];
 
