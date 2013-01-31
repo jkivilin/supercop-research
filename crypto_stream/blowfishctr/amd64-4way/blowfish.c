@@ -307,37 +307,40 @@ static const u32 bf_sbox[256 * 4] = {
 #define bf_F(x) (((S[GET32_0(x)] + S[256 + GET32_1(x)]) ^ \
 		S[512 + GET32_2(x)]) + S[768 + GET32_3(x)])
 
-#define ROUND(a, b, n) ({ b ^= P[n]; a ^= bf_F(b); })
+#define LOAD_KEY(n) ({ key = P[n]; })
+#define ROUND(a, b, n) ({ b ^= key; LOAD_KEY(n); a ^= bf_F(b); })
 
 /*
  * The blowfish encipher, processes 64-bit blocks.
  * NOTE: This function MUSTN'T respect endianess
  */
-static void encrypt_block(struct blowfish_ctx *bctx, u32 *dst, u32 *src)
+static void inline __attribute__((always_inline)) encrypt_block(struct blowfish_ctx *bctx, u32 *dst, u32 *src)
 {
 	const u32 *P = bctx->p;
 	const u32 *S = bctx->s[0];
+	u32 key;
 	u32 yl = src[0];
 	u32 yr = src[1];
 
-	ROUND(yr, yl, 0);
-	ROUND(yl, yr, 1);
-	ROUND(yr, yl, 2);
-	ROUND(yl, yr, 3);
-	ROUND(yr, yl, 4);
-	ROUND(yl, yr, 5);
-	ROUND(yr, yl, 6);
-	ROUND(yl, yr, 7);
-	ROUND(yr, yl, 8);
-	ROUND(yl, yr, 9);
-	ROUND(yr, yl, 10);
-	ROUND(yl, yr, 11);
-	ROUND(yr, yl, 12);
-	ROUND(yl, yr, 13);
-	ROUND(yr, yl, 14);
-	ROUND(yl, yr, 15);
+	LOAD_KEY(0);
+	ROUND(yr, yl, 1);
+	ROUND(yl, yr, 2);
+	ROUND(yr, yl, 3);
+	ROUND(yl, yr, 4);
+	ROUND(yr, yl, 5);
+	ROUND(yl, yr, 6);
+	ROUND(yr, yl, 7);
+	ROUND(yl, yr, 8);
+	ROUND(yr, yl, 9);
+	ROUND(yl, yr, 10);
+	ROUND(yr, yl, 11);
+	ROUND(yl, yr, 12);
+	ROUND(yr, yl, 13);
+	ROUND(yl, yr, 14);
+	ROUND(yr, yl, 15);
+	ROUND(yl, yr, 16);
 
-	yl ^= P[16];
+	yl ^= key;
 	yr ^= P[17];
 
 	dst[0] = yr;
