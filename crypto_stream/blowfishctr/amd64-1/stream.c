@@ -22,18 +22,14 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	blowfish_init(ctx, k, CRYPTO_KEYBYTES);
 	iv = __builtin_bswap64(*(uint64_t *)n); /* be => le */
 
-	while (likely(inlen > 0)) {
+	while (likely(inlen >= BLOCKSIZE)) {
 		block = __builtin_bswap64(iv++); /* le => be */
 
-		blowfish_enc_blk(ctx, &block, &block);
-		if (unlikely(inlen < BLOCKSIZE))
-			break;
+		blowfish_enc_blk(ctx, out, &block);
 
 		if (unlikely(in)) {
-			*(uint64_t *)out = *(uint64_t *)in ^ block;
+			*(uint64_t *)out ^= *(uint64_t *)in;
 			in += BLOCKSIZE;
-		} else {
-			*(uint64_t *)out = block;
 		}
 
 		out += BLOCKSIZE;
@@ -43,6 +39,10 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	if (unlikely(inlen > 0)) {
 		/* handle remaining bytes */
 		unsigned int i;
+
+		block = __builtin_bswap64(iv); /* le => be */
+
+		blowfish_enc_blk(ctx, &block, &block);
 
 		if (in) {
 			for (i = 0; i < inlen; i++)

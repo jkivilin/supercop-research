@@ -53,10 +53,10 @@
 #define F() \
 	movzbl RX0bh,		RT1d; \
 	movzbl RX0bl,		RT3d; \
-	rorq $16,		RX0; \
+	rorq $16,		RX0;  \
 	movzbl RX0bh,		RT0d; \
 	movzbl RX0bl,		RT2d; \
-	rorq $16,		RX0; \
+	rorq $16,		RX0;  \
 	movl s0(CTX,RT0,4),	RT0d; \
 	addl s1(CTX,RT2,4),	RT0d; \
 	xorl s2(CTX,RT1,4),	RT0d; \
@@ -114,7 +114,6 @@ blowfish_enc_blk:
 	 *	%rdx: src
 	 */
 	movq %rbp, %r11;
-	pushq %r12
 
 	movq %rsi, %r10;
 	movq %rdx, RIO;
@@ -136,7 +135,7 @@ blowfish_enc_blk:
 
 	movq %r10, RIO;
 	write_block();
-	popq %r12
+
 	ret;
 
 .align 8
@@ -150,7 +149,6 @@ blowfish_dec_blk:
 	 *	%rdx: src
 	 */
 	movq %rbp, %r11;
-	pushq %r12
 
 	movq %rsi, %r10;
 	movq %rdx, RIO;
@@ -172,7 +170,6 @@ blowfish_dec_blk:
 	write_block();
 
 	movq %r11, %rbp;
-	popq %r12
 
 	ret;
 
