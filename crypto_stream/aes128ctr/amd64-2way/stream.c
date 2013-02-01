@@ -9,18 +9,15 @@
 
 #define BLOCKSIZE 16
 
-extern void asm_aes_encrypt2X(struct aes_ctx *ctx, const void *in, void *out, int count);
-extern void asm_ctr_match_aes_encryptX_xor(struct aes_ctx *ctx, uint32_t ctrcache[6], void *out, int count);
+extern void aes_encrypt(struct aes_ctx *ctx, uint32_t out[4], const uint32_t in[4]);
 
-static inline void aes_enc_blk2(struct aes_ctx *ctx, void *out, const void *in)
-{
-	asm_aes_encrypt2X(ctx, in, out, 2);
-}
+extern void aes_get_ctr_cache(struct aes_ctx *ctx, uint32_t ctr_cache[5], uint32_t iv[4]);
+extern void aes_ctr_match_encrypt(struct aes_ctx *ctx, uint32_t out[4], const uint32_t ctr_cache[5], unsigned char counter);
 
-static inline void aes_enc_ctr_blk2(struct aes_ctx *ctx, uint32_t ctrcache[6], void *out)
-{
-	asm_ctr_match_aes_encryptX_xor(ctx, ctrcache, out, 2);
-}
+extern void aes_enc_blk2(struct aes_ctx *ctx, void *out, const void *in);
+
+extern void aes_get_counter_cache(struct aes_ctx *ctx, uint32_t ctr_cache[5], const void *iv_be);
+extern void aes_enc_blk2_ctr_cached(struct aes_ctx *ctx, void *out, uint32_t ctr_cache[5], uint8_t ctr_byte);
 
 typedef struct {
 	uint64_t ll[2];
@@ -74,17 +71,50 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	CTX_TYPE *ctx = PTR_ALIGN(ctxbuf, align - 1);
 	uint128_t iv;
 	uint128_t ivs[2];
+	uint32_t ctr_cache[5];
+	int need_new_ctr_cache = 1;
 
 	aes_init(ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
 	while (likely(inlen >= BLOCKSIZE * 2)) {
-		bswap128(&ivs[0], &iv); /* le => be */
-		add128(&ivs[1], &iv, 1);
-		bswap128(&ivs[1], &ivs[1]); /* le => be */
-		add128(&iv, &iv, 2);
+		uint8_t ctr_byte = ((uint8_t *)&iv)[0]; /* le */
 
-		aes_enc_blk2(ctx, out, (uint8_t *)ivs);
+		/*
+		 * Check the counter byte that is used to indicate ctr-cache
+		 * changes.
+		 */
+		if (unlikely(ctr_byte == 0xff)) {
+			/*
+			 * Do slow, not ctr-mode cached processing, since
+			 * blocks would have to use different cache.
+			 */
+			bswap128(&ivs[0], &iv); /* le => be */
+			add128(&ivs[1], &iv, 1);
+			bswap128(&ivs[1], &ivs[1]); /* le => be */
+			add128(&iv, &iv, 2);
+
+			aes_enc_blk2(ctx, out, (uint8_t *)ivs);
+
+			need_new_ctr_cache = 1;
+		} else {
+			if (unlikely(ctr_byte == 0x00))
+				need_new_ctr_cache = 1;
+
+			if (unlikely(need_new_ctr_cache)) {
+				bswap128(&ivs[0], &iv); /* le => be */
+
+				/*
+				 * ctr-cache has to be updated
+				 */
+				need_new_ctr_cache = 0;
+				aes_get_counter_cache(ctx, ctr_cache, &ivs[0]);
+			}
+
+			add128(&iv, &iv, 2);
+
+			aes_enc_blk2_ctr_cached(ctx, out, ctr_cache, ctr_byte);
+		}
 
 		if (unlikely(in)) {
 			xor128(&((uint128_t *)out)[0], &((uint128_t *)out)[0], &((uint128_t *)in)[0]);

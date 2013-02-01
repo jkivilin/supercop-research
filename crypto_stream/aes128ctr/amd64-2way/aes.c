@@ -601,3 +601,213 @@ void aes_init(struct aes_ctx * ctx, const uint8_t *key, int keylen)
 {
 	aes_setup(ctx, key, keylen);
 }
+
+#define ADD_ROUND_KEY_4(b,w) ( { \
+		b[0] ^= *(keysched + (w)*4); \
+		b[1] ^= *(keysched + (w)*4 + 1); \
+		b[2] ^= *(keysched + (w)*4 + 2); \
+		b[3] ^= *(keysched + (w)*4 + 3); \
+	} )
+#define MOVEWORD(b, n, i) ({ b[i] = n[i]; })
+
+/*
+ * Macros for the encryption routine.
+ */
+#define MAKEWORD(b, n, i) ( { \
+		const int C1 = 1, C2 = 2, C3 = 3; \
+		n[i] = E(0, (b[i] >> 0) & 0xFF) ^ \
+			E(1, (b[(i+C1)&3] >> 8) & 0xFF) ^ \
+			E(2, (b[(i+C2)&3] >> 16) & 0xFF) ^ \
+			E(3, (b[(i+C3)&3] >> 24) & 0xFF); \
+	} )
+#define LASTWORD(b, n, i) ( { \
+		const int C1 = 1, C2 = 2, C3 = 3; \
+		n[i] = (Sbox(3, (b[i] >> 0) & 0xFF)) | \
+			(Sbox(2, (b[(i+C1)&3] >> 8) & 0xFF)) | \
+			(Sbox(1, (b[(i+C2)&3] >> 16) & 0xFF)) | \
+			(Sbox(0, (b[(i+C3)&3] >> 24) & 0xFF)); \
+	} )
+
+#define ROUND_NOKEY(a, b) ( { \
+		MAKEWORD(a, b, 0); \
+		MAKEWORD(a, b, 1); \
+		MAKEWORD(a, b, 2); \
+		MAKEWORD(a, b, 3); \
+	} )
+
+#define ROUND(w, a, b) ( { \
+		ADD_ROUND_KEY_4(a, w); \
+		\
+		ROUND_NOKEY(a, b); \
+	} )
+
+#define LASTROUND(w, a, b) ( { \
+		\
+		ADD_ROUND_KEY_4(a, w); \
+		\
+		LASTWORD(a, b, 0); \
+		LASTWORD(a, b, 1); \
+		LASTWORD(a, b, 2); \
+		LASTWORD(a, b, 3); \
+		\
+		ADD_ROUND_KEY_4(b, w + 1); \
+	} )
+
+void aes_encrypt(struct aes_ctx *ctx, uint32_t out[4], const uint32_t in[4])
+{
+	const uint32_t *keysched = ctx->keysched;
+	uint32_t a[4], b[4];
+
+	a[0] = in[0];
+	a[1] = in[1];
+	a[2] = in[2];
+	a[3] = in[3];
+
+	ROUND(0, a, b);
+	ROUND(1, b, a);
+	ROUND(2, a, b);
+	ROUND(3, b, a);
+	ROUND(4, a, b);
+	ROUND(5, b, a);
+	ROUND(6, a, b);
+	ROUND(7, b, a);
+	ROUND(8, a, b);
+	if ((ctx->Nr < 12)) {
+		LASTROUND(9, b, a);
+	} else if (ctx->Nr == 12) {
+		ROUND(9, b, a);
+		ROUND(10, a, b);
+		LASTROUND(11, b, a);
+	} else {
+		ROUND(9, b, a);
+		ROUND(10, a, b);
+		ROUND(11, b, a);
+		ROUND(12, a, b);
+		LASTROUND(13, b, a);
+	}
+
+	out[0] = a[0];
+	out[1] = a[1];
+	out[2] = a[2];
+	out[3] = a[3];
+}
+
+void aes_get_ctr_cache(struct aes_ctx *ctx, uint32_t ctr_cache[5], uint32_t iv[4])
+{
+	const uint32_t *keysched = ctx->keysched;
+	const uint32_t *ctr_match = iv;
+	uint32_t a[4], b[4];
+
+	a[0] = ctr_match[0];
+	a[1] = ctr_match[1];
+	a[2] = ctr_match[2];
+	a[3] = ctr_match[3];
+
+	ADD_ROUND_KEY_4(a, 0);
+
+	b[0] = E(0, a[0] & 0xFF); a[0] >>= 8;
+	b[1] = E(0, a[1] & 0xFF); a[1] >>= 8;
+	b[2] = E(0, a[2] & 0xFF); a[2] >>= 8;
+	b[3] = E(0, a[3] & 0xFF); a[3] >>= 8;
+
+	b[3] ^= E(1, a[0] & 0xFF); a[0] >>= 8;
+	b[0] ^= E(1, a[1] & 0xFF); a[1] >>= 8;
+	b[1] ^= E(1, a[2] & 0xFF); a[2] >>= 8;
+	b[2] ^= E(1, a[3] & 0xFF); a[3] >>= 8;
+
+	b[2] ^= E(2, a[0] & 0xFF); a[0] >>= 8;
+	b[3] ^= E(2, a[1] & 0xFF); a[1] >>= 8;
+	b[0] ^= E(2, a[2] & 0xFF); a[2] >>= 8;
+	b[1] ^= E(2, a[3] & 0xFF); a[3] >>= 8;
+
+	b[1] ^= E(3, a[0]);
+	b[2] ^= E(3, a[1]);
+	b[3] ^= E(3, a[2]);
+	b[0] ^= 0/*E(3, a[3])*/;
+
+	ctr_cache[4] = b[0];
+	b[0] = 0;
+
+	ADD_ROUND_KEY_4(b, 1);
+
+	//a[0] = E(0, b[0] & 0xFF); b[0] >>= 8;
+	a[1] = E(0, b[1] & 0xFF); b[1] >>= 8;
+	a[2] = E(0, b[2] & 0xFF); b[2] >>= 8;
+	a[3] = E(0, b[3] & 0xFF); b[3] >>= 8;
+
+	//a[3] ^= E(1, b[0] & 0xFF); b[0] >>= 8;
+	a[0] = E(1, b[1] & 0xFF); b[1] >>= 8;
+	a[1] ^= E(1, b[2] & 0xFF); b[2] >>= 8;
+	a[2] ^= E(1, b[3] & 0xFF); b[3] >>= 8;
+
+	//a[2] ^= E(2, b[0] & 0xFF); b[0] >>= 8;
+	a[3] ^= E(2, b[1] & 0xFF); b[1] >>= 8;
+	a[0] ^= E(2, b[2] & 0xFF); b[2] >>= 8;
+	a[1] ^= E(2, b[3] & 0xFF); b[3] >>= 8;
+
+	//a[1] ^= E(3, b[0]);
+	a[2] ^= E(3, b[1]);
+	a[3] ^= E(3, b[2]);
+	a[0] ^= E(3, b[3]);
+
+	ADD_ROUND_KEY_4(a, 2);
+
+	ctr_cache[0] = a[0];
+	ctr_cache[1] = a[1];
+	ctr_cache[2] = a[2];
+	ctr_cache[3] = a[3];
+}
+
+void aes_ctr_match_encrypt(struct aes_ctx *ctx, uint32_t out[4], const uint32_t ctr_cache[5], unsigned char counter)
+{
+	const uint32_t *keysched = ctx->keysched;
+	uint32_t a[4], b[4];
+	uint32_t ctr;
+
+	// round 0
+	ctr = counter & 0xff;
+
+	b[0] = ctr_cache[4];
+
+	ctr ^= (keysched[3] >> 24) & 0xff;
+	b[0] ^= E(3, ctr);
+
+	// round 1
+	b[0] ^= *(keysched + 4);
+
+	a[0] = ctr_cache[0];
+	a[1] = ctr_cache[1];
+	a[2] = ctr_cache[2];
+	a[3] = ctr_cache[3];
+
+	a[0] ^= E(0, b[0] & 0xFF); b[0] >>= 8;
+	a[3] ^= E(1, b[0] & 0xFF); b[0] >>= 8;
+	a[2] ^= E(2, b[0] & 0xFF); b[0] >>= 8;
+	a[1] ^= E(3, b[0] & 0xFF);
+
+	ROUND_NOKEY(a, b);
+	ROUND(3, b, a);
+	ROUND(4, a, b);
+	ROUND(5, b, a);
+	ROUND(6, a, b);
+	ROUND(7, b, a);
+	ROUND(8, a, b);
+	if ((ctx->Nr < 12)) {
+		LASTROUND(9, b, a);
+	} else if (ctx->Nr == 12) {
+		ROUND(9, b, a);
+		ROUND(10, a, b);
+		LASTROUND(11, b, a);
+	} else {
+		ROUND(9, b, a);
+		ROUND(10, a, b);
+		ROUND(11, b, a);
+		ROUND(12, a, b);
+		LASTROUND(13, b, a);
+	}
+
+	out[0] = a[0];
+	out[1] = a[1];
+	out[2] = a[2];
+	out[3] = a[3];
+}

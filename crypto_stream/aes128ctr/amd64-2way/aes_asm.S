@@ -273,24 +273,26 @@
 	\
 	encround_complete_addroundkey1(w, a, b);
 
-.align 4
-.global asm_aes_get_ctr_cache
-.type   asm_aes_get_ctr_cache,@function;
+.align 8
+.global aes_get_counter_cache
+.type   aes_get_counter_cache,@function;
 
-asm_aes_get_ctr_cache:
+aes_get_counter_cache:
 	// input:
 	//	%rdi: ctx, CTX
-	//	%rsi: ctr_cache
+	//	%rsi: ctr_cache (uint32_t[5])
+	//	%rdx: iv (big endian)
 	pushq %rbp;
 	pushq %rbx;
 	pushq %r12;
 	pushq %r13;
 	pushq %r14;
 	pushq %r15;
+	subq $8, %rsp;
 
-	movq %rsi, -8(%rsp); // ctr_cache
+	movq %rsi, (%rsp); // store ctr_cache pointer to stack
 
-	leaq counter(CTX), RIO0; // in1, counter
+	movq %rdx, RIO0; // in1, counter
 
 	loadblock1(RIO, RA, RB);
 
@@ -298,12 +300,9 @@ asm_aes_get_ctr_cache:
 
 	addroundkey1(0, RA, RB);
 
-	/* new_l[0] = 0; */
+	/* new_l[0] = E(0, a[0] & 0xFF); */
 	/* new_h[1] = E(1, a[0] & 0xFF); */
-	xorl RLA0d,			RLA0d;
-	movzbl RA0bh,			RX1d;
-	movl E1(,RX1,Emul),		RHB0d;
-	shrq $16,			RA0;
+	do16bit_ror(16, mov, RA0, Emul, E0, RLA0, E1, RHB0, RX0, RX1);
 	/* new_l[1] = E(0, a[1] & 0xFF); */
 	/* new_h[0] = E(1, a[1] & 0xFF); */
 	do16bit_shr(16, mov, RB0, Emul, E0, RLB0, E1, RHA0, RX0, RX1);
@@ -323,25 +322,26 @@ asm_aes_get_ctr_cache:
 	do16bit_shr(16, xor, RB0, Emul, E0, RHB0, E1, RLB0, RX0, RX1);
 
 	/* new_h[0] ^= E(2, a[1] & 0xFF); */
-	/* new_l[0] ^= E(3, a[1] & 0xFF); */
-	do16bit(xor, RB0, Emul, E2, RHA0, E3, RLA0, RX0, RX1);
+	/* new_l[0] ^= 0; ...  E(3, a[1] & 0xFF); */
+	movzbl RB0bl,		RX0d;
+	xorl E2(,RX0,Emul),	RHA0d;
 	/* new_h[1] ^= E(2, a[0] & 0xFF); */
 	/* new_l[1] ^= E(3, a[0] & 0xFF); */
 	do16bit(xor, RA0, Emul, E2, RHB0, E3, RLB0, RX0, RX1);
 
 	/* block[0] = ((uint64)new_h[0] << 32) | new_l[0]; */
-	shlq $32,			RHA0;
-	movl RLA0d,			RA0d;
-	orq RHA0,			RA0;
+	shlq $32,		RHA0;
+	movl RLA0d,		RA0d;
+	orq RHA0,		RA0;
 
 	/* block[1] = ((uint64)new_h[1] << 32) | new_l[1]; */
-	shlq $32,			RHB0;
-	movl RLB0d,			RB0d;
-	orq RHB0,			RB0;
+	shlq $32,		RHB0;
+	movl RLB0d,		RB0d;
+	orq RHB0,		RB0;
 
 	/* ctr_cache[4] = new_l[0]; */
-	movq -8(%rsp), RX0;
-	movl RLA0d, 4*4(RX0);
+	movq (%rsp),		RX0;
+	movl RLA0d,		4*4(RX0);
 
 	/************ partial round 1 ************/
 
@@ -386,10 +386,11 @@ asm_aes_get_ctr_cache:
 
 	/* ((uint64 *)ctr_cache)[0] = block[0]; */
 	/* ((uint64 *)ctr_cache)[2] = block[1]; */
-	movq -8(%rsp), RX0;
+	movq (%rsp), RX0;
 	movq RA0, (RX0);
 	movq RB0, 8(RX0);
 
+	addq $8, %rsp;
 	popq %r15;
 	popq %r14;
 	popq %r13;
@@ -654,15 +655,14 @@ ___enc1_keylen_eq_12:
 	encround_complete_addroundkey2(w, a, b);
 
 .align 4
-.global asm_aes_encrypt2X
-.type   asm_aes_encrypt2X,@function;
+.global aes_enc_blk2
+.type   aes_enc_blk2,@function;
 
-asm_aes_encrypt2X:
+aes_enc_blk2:
 	// input:
 	//	%rdi: ctx,  CTX
-	//	%rsi: in: [2n: 16 bytes][2n+1: 16 bytes]...
-	//	%rdx: out: [2n: 16 bytes][2n+1: 16 bytes]...
-	//	%rcx: block count: multiple of 2, always atleast 2
+	//	%rsi: out: [2n: 16 bytes][2n+1: 16 bytes]...
+	//	%rdx: in: [2n: 16 bytes][2n+1: 16 bytes]...
 
 	pushq %rbp;
 	pushq %rbx;
@@ -671,94 +671,26 @@ asm_aes_encrypt2X:
 	pushq %r14;
 	pushq %r15;
 
-#define STACK_OUT -24(%rsp)
-#define STACK_IN -16(%rsp)
-#define STACK_COUNT -8(%rsp)
+	pushq %rsi; /* out */
 
-	movq %rdx, STACK_OUT;
-
-.align 4
-___enc2_loop:
-	movq %rcx, STACK_COUNT;
-	movq %rsi, STACK_IN;
-
-	movq %rsi, RIO0;	// inX
+	movq %rdx, RIO0; // in
 	loadblock2(RIO0, RA, RB);
 
 	addroundkey2(0, RA, RB);
 	encround2(1, RA, RB);
 	encround2(2, RA, RB);
-	encround2(3, RA, RB);
-	encround2(4, RA, RB);
-	encround2(5, RA, RB);
-	encround2(6, RA, RB);
-	encround2(7, RA, RB);
-	encround2(8, RA, RB);
-	encround2(9, RA, RB);
-
-	cmp $12, nr(CTX);
-	jae ___enc2_keylen_over_or_eq_12;
-
-	enclastround2(10, RA, RB);
+	jmp .L___enc2_tail;
 
 .align 4
-___enc2_exit:
-	movq STACK_OUT, RIO0;		// outX
-	saveblock2(RIO0, RA, RB);
+.global aes_enc_blk2_ctr_cached
+.type   aes_enc_blk2_ctr_cached,@function;
 
-	addq $(2*4*4), RIO0;		// outX + 2
-	movq RIO0, STACK_OUT;
-
-	movq STACK_IN, %rsi;
-	addq $(2*4*4), %rsi;		// inX + 2
-	movq STACK_COUNT, %rcx;		
-	subl $2, %ecx;			// count - 2
-	jnz ___enc2_loop;
-
-	popq %r15;
-	popq %r14;
-	popq %r13;
-	popq %r12;
-	popq %rbx;
-	popq %rbp;
-
-	ret;
-
-.align 4
-___enc2_keylen_over_or_eq_12:
-	je ___enc2_keylen_eq_12;
-
-	encround2(10, RA, RB);
-	encround2(11, RA, RB);
-	encround2(12, RA, RB);
-	encround2(13, RA, RB);
-	enclastround2(14, RA, RB);
-
-	jmp ___enc2_exit;
-
-.align 4
-___enc2_keylen_eq_12:
-
-	encround2(10, RA, RB);
-	encround2(11, RA, RB);
-	enclastround2(12, RA, RB);
-
-	jmp ___enc2_exit;
-
-#undef STACK_OUT
-#undef STACK_IN
-#undef STACK_COUNT
-
-.align 4
-.global asm_ctr_match_aes_encryptX_xor
-.type   asm_ctr_match_aes_encryptX_xor,@function;
-
-asm_ctr_match_aes_encryptX_xor:
+aes_enc_blk2_ctr_cached:
 	// input:
 	//	%rdi: ctx, CTX
-	//	%rsi: ctr_cache
-	//	%rdx: out: [2n: 16 bytes][2n+1: 16 bytes]...
-	//	%rcx: block count: multiple of 2, always atleast 2
+	//	%rsi: out, two blocks
+	//	%rdx: ctr_cache
+	//	%cl: counter byte
 
 	pushq %rbp;
 	pushq %rbx;
@@ -766,39 +698,25 @@ asm_ctr_match_aes_encryptX_xor:
 	pushq %r13;
 	pushq %r14;
 	pushq %r15;
+	pushq %rsi; // out
 
-#define STACK_OUT -24(%rsp)
-#define STACK_CTRCACHE -8(%rsp)
-#define STACK_COUNT -16(%rsp)
-
-	movq %rdx, STACK_OUT; // out
-	movq %rsi, STACK_CTRCACHE;  // ctr_cache
-
-.align 4
-___ctrenc2_loop:
-	movq %rcx, STACK_COUNT; // count
+	movq %rdx, %rsi;
 
 	// load data to free registers for use (avoid using RX0 = %rsi)
-	movl counter(CTX), RX1d;
+	movzbl %cl, RLA0d;
 	movl 16(%rsi), RA0d;
+		leal 1(RLA0d), RLA1d;
 		movl RA0d, RA1d;
-
-	movzbl RX1b, RLA0d;
-		movzbl RX1b, RLA1d;
-		addl $1, RLA1d;
-	addl $2, RX1d;
-	movl RX1d, counter(CTX);
 
 	// partial round0
 	movl keysched+4*4(CTX), RX1d;
-	movl keysched(CTX), RHA0d;
+	movzbl keysched+15(CTX), RHA0d;
 
+	// E(3, (a[3] ^ key) & 0xFF)
 	xorl RHA0d, RLA0d;
-	movzbl RLA0b, RLA0d;
-	xorl E0(,RLA0,Emul), RA0d;
+	xorl E3(,RLA0,Emul), RA0d;
 		xorl RHA0d, RLA1d;
-		movzbl RLA1b, RLA1d;
-		xorl E0(,RLA1,Emul), RA1d;
+		xorl E3(,RLA1,Emul), RA1d;
 
 	movq (%rsi), RHA0;
 	movq 8(%rsi), RHB0;
@@ -845,6 +763,8 @@ ___ctrenc2_loop:
 		xorq RHA1, RA1;
 		xorq RHB1, RB1;
 
+.align 4
+.L___enc2_tail:
 	encround2(3, RA, RB);
 	encround2(4, RA, RB);
 	encround2(5, RA, RB);
@@ -854,23 +774,14 @@ ___ctrenc2_loop:
 	encround2(9, RA, RB);
 
 	cmp $12, nr(CTX);
-	jae ___ctrenc2_keylen_over_or_eq_12;
+	jae .L___enc2_keylen_over_or_eq_12;
 
 	enclastround2(10, RA, RB);
 
 .align 4
-___ctrenc2_exit:
-	movq STACK_OUT, RIO0;		// out
-	xorblock2(RIO0, RA, RB);
-
-	addq $32, RIO0;			// out + 2
-	movq RIO0, STACK_OUT;
-
-	movq STACK_COUNT, %rcx;		// count
-	movq STACK_CTRCACHE, %rsi;	// ctr_cache
-
-	subl $2, %ecx;
-	jnz ___ctrenc2_loop;
+.L___enc2_exit:
+	popq RIO0; // out
+	saveblock2(RIO0, RA, RB);
 
 	popq %r15;
 	popq %r14;
@@ -882,8 +793,8 @@ ___ctrenc2_exit:
 	ret;
 
 .align 4
-___ctrenc2_keylen_over_or_eq_12:
-	je ___ctrenc2_keylen_eq_12;
+.L___enc2_keylen_over_or_eq_12:
+	je .L___enc2_keylen_eq_12;
 
 	encround2(10, RA, RB);
 	encround2(11, RA, RB);
@@ -891,18 +802,14 @@ ___ctrenc2_keylen_over_or_eq_12:
 	encround2(13, RA, RB);
 	enclastround2(14, RA, RB);
 
-	jmp ___ctrenc2_exit;
+	jmp .L___enc2_exit;
 
 .align 4
-___ctrenc2_keylen_eq_12:
+.L___enc2_keylen_eq_12:
 	encround2(10, RA, RB);
 	encround2(11, RA, RB);
 	enclastround2(12, RA, RB);
 
-	jmp ___ctrenc2_exit;
-
-#undef STACK_OUT
-#undef STACK_CTRCACHE
-#undef STACK_COUNT
+	jmp .L___enc2_exit;
 
 #endif
