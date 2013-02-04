@@ -65,6 +65,10 @@ static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t
 		 : "xmm0", "memory" \
 	);})
 
+static unsigned char bswap128const[16] = {
+	15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+};
+
 int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
@@ -81,22 +85,62 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
 	while (likely(inlen >= BLOCKSIZE * 8)) {
-		bswap128(&ivs[0], &iv); /* le => be */
-		add128(&ivs[1], &iv, 1);
-		bswap128(&ivs[1], &ivs[1]); /* le => be */
-		add128(&ivs[2], &iv, 2);
-		bswap128(&ivs[2], &ivs[2]); /* le => be */
-		add128(&ivs[3], &iv, 3);
-		bswap128(&ivs[3], &ivs[3]); /* le => be */
-		add128(&ivs[4], &iv, 4);
-		bswap128(&ivs[4], &ivs[4]); /* le => be */
-		add128(&ivs[5], &iv, 5);
-		bswap128(&ivs[5], &ivs[5]); /* le => be */
-		add128(&ivs[6], &iv, 6);
-		bswap128(&ivs[6], &ivs[6]); /* le => be */
-		add128(&ivs[7], &iv, 7);
-		bswap128(&ivs[7], &ivs[7]); /* le => be */
-		add128(&iv, &iv, 8);
+		if (unlikely(iv.ll[0] > (0xffffffffffffffffULL - 8))) {
+			bswap128(&ivs[0], &iv); /* le => be */
+			add128(&ivs[1], &iv, 1);
+			bswap128(&ivs[1], &ivs[1]); /* le => be */
+			add128(&ivs[2], &iv, 2);
+			bswap128(&ivs[2], &ivs[2]); /* le => be */
+			add128(&ivs[3], &iv, 3);
+			bswap128(&ivs[3], &ivs[3]); /* le => be */
+			add128(&ivs[4], &iv, 4);
+			bswap128(&ivs[4], &ivs[4]); /* le => be */
+			add128(&ivs[5], &iv, 5);
+			bswap128(&ivs[5], &ivs[5]); /* le => be */
+			add128(&ivs[6], &iv, 6);
+			bswap128(&ivs[6], &ivs[6]); /* le => be */
+			add128(&ivs[7], &iv, 7);
+			bswap128(&ivs[7], &ivs[7]); /* le => be */
+			add128(&iv, &iv, 8);
+		} else {
+			__asm__ (
+				"vpcmpeqd %%xmm0, %%xmm0, %%xmm0; \n"
+				"vpsrldq $8, %%xmm0, %%xmm0; \n"
+				"vmovdqu %[bswap], %%xmm1; \n"
+				/* load IV and byteswap */
+				"vmovdqu %[iv], %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 0*16(%[ivs]); \n"
+				/* construct IVs */
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 1*16(%[ivs]); \n"
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 2*16(%[ivs]); \n"
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 3*16(%[ivs]); \n"
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 4*16(%[ivs]); \n"
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 5*16(%[ivs]); \n"
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 6*16(%[ivs]); \n"
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vpshufb %%xmm1, %%xmm7, %%xmm2; \n"
+				"vmovdqu %%xmm2, 7*16(%[ivs]); \n"
+				"vpsubq %%xmm0, %%xmm7, %%xmm7; \n"
+				"vmovdqu %%xmm7, %[iv]; \n"
+				:
+				: [ivs] "r" (&ivs[0]), [iv] "m" (iv),
+				  [bswap] "m" (bswap128const[0])
+				: "memory", "xmm0", "xmm1", "xmm2", "xmm7"
+			);
+		}
 
 		twofish_ecb_enc_8way(ctx, out, (uint8_t *)ivs);
 
@@ -145,7 +189,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 				out[j] = in[j] ^ ((uint8_t*)&ivs[i])[j];
 		} else {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {
-				*(uint128_t *)out = ivs[i];
+				move128((uint128_t *)out, &ivs[i]);
 
 				inlen -= BLOCKSIZE;
 				out += BLOCKSIZE;

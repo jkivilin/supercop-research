@@ -65,6 +65,10 @@ static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t
 		 : "xmm0", "memory" \
 	);})
 
+static unsigned char bswap128const[16] = {
+	15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+};
+
 int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
@@ -147,7 +151,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 				out[j] = in[j] ^ ((uint8_t*)&ivs[i])[j];
 		} else {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {
-				*(uint128_t *)out = ivs[i];
+				move128((uint128_t *)out, &ivs[i]);
 
 				inlen -= BLOCKSIZE;
 				out += BLOCKSIZE;
