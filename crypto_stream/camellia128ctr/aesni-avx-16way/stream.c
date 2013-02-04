@@ -57,8 +57,20 @@ static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t
 	);
 }
 
+static inline void mov128(uint128_t *dst, const uint128_t *src)
+{
+	__asm__ (
+		"vmovdqu %[s], %%xmm0;\n"
+		"vmovdqu %%xmm0, %[d];\n"
+		: [d] "=m" (*dst)
+		: [s] "m" (*src)
+		: "xmm0", "memory"
+	);
+}
+
 /* IV must be little-endian, 'in' maybe set NULL */
-extern void camellia_ctr_16way(struct camellia_ctx *ctx, void *out, const void *in, uint128_t *iv);
+extern void camellia_ctr_16way(struct camellia_ctx *ctx, void *out, const void *in,
+			       uint128_t *iv, unsigned long num_of_chunks);
 
 int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
@@ -74,19 +86,21 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	camellia_init(ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
-	while (likely(inlen >= PARALLEL_BLOCKS * BLOCKSIZE)) {
-		camellia_ctr_16way(ctx, out, in, &iv);
+	if (likely(inlen >= PARALLEL_BLOCKS * BLOCKSIZE)) {
+		unsigned long chunks = inlen / (PARALLEL_BLOCKS * BLOCKSIZE);
 
-		inlen -= PARALLEL_BLOCKS * BLOCKSIZE;
-		out += PARALLEL_BLOCKS * BLOCKSIZE;
-		in += unlikely(in) ? PARALLEL_BLOCKS * BLOCKSIZE : 0;
+		camellia_ctr_16way(ctx, out, in, &iv, chunks);
+
+		inlen -= chunks * PARALLEL_BLOCKS * BLOCKSIZE;
+		out += chunks * PARALLEL_BLOCKS * BLOCKSIZE;
+		in += unlikely(in) ? chunks * PARALLEL_BLOCKS * BLOCKSIZE : 0;
 	}
 
 	if (unlikely(inlen > 0)) {
 		uint128_t buf[PARALLEL_BLOCKS];
 		unsigned int i, j;
 
-		camellia_ctr_16way(ctx, buf, NULL, &iv);
+		camellia_ctr_16way(ctx, buf, NULL, &iv, 1);
 
 		if (in) {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {
@@ -101,7 +115,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 				out[j] = in[j] ^ ((uint8_t*)&buf[i])[j];
 		} else {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {
-				*(uint128_t *)out = buf[i];
+				mov128((uint128_t *)out, &buf[i]);
 
 				inlen -= BLOCKSIZE;
 				out += BLOCKSIZE;

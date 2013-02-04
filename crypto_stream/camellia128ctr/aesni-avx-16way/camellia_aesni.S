@@ -1129,10 +1129,16 @@ camellia_ctr_16way:
 	 *	%rsi: dst (16 blocks)
 	 *	%rdx: src (16 blocks)
 	 *	%rcx: iv (little endian, 128bit)
+	 *	%r8: count, number of 16*16 byte chunks
 	 */
+	movq %r8, %r9;
 
+.align 4
+.Lctr_loop:
 	subq $(16 * 16), %rsp;
 	movq %rsp, %rax;
+
+	cmpq $(0xffffffffffffffff - 16), (%rcx);
 
 	vmovdqa .Lbswap128_mask, %xmm14;
 
@@ -1144,6 +1150,48 @@ camellia_ctr_16way:
 	vpcmpeqd %xmm15, %xmm15, %xmm15;
 	vpsrldq $8, %xmm15, %xmm15; /* low: -1, high: 0 */
 
+	ja .Lload_ctr_carry;
+
+	/* construct IVs */
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm13;
+	vmovdqu %xmm13, 14 * 16(%rax);
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm13;
+	vmovdqu %xmm13, 13 * 16(%rax);
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm12;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm11;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm10;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm9;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm8;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm7;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm6;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm5;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm4;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm3;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm2;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpshufb %xmm14, %xmm0, %xmm1;
+	vpsubq %xmm15, %xmm0, %xmm0;
+	vpsubq %xmm15, %xmm0, %xmm13;
+	vpshufb %xmm14, %xmm0, %xmm0;
+	vmovdqu %xmm13, (%rcx);
+
+	jmp .Lload_ctr_done;
+
+.align 4
+.Lload_ctr_carry:
 	/* construct IVs */
 	inc_le128(%xmm0, %xmm15, %xmm13);
 	vpshufb %xmm14, %xmm0, %xmm13;
@@ -1181,6 +1229,8 @@ camellia_ctr_16way:
 	inc_le128(%xmm13, %xmm15, %xmm14);
 	vmovdqu %xmm13, (%rcx);
 
+.align 4
+.Lload_ctr_done:
 	/* inpack16_pre: */
 	vmovq (key_table)(CTX), %xmm15;
 	vpshufb .Lpack_bswap, %xmm15, %xmm15;
@@ -1224,9 +1274,15 @@ camellia_ctr_16way:
 	vpxor 13 * 16(%rdx), %xmm10, %xmm10;
 	vpxor 14 * 16(%rdx), %xmm9, %xmm9;
 	vpxor 15 * 16(%rdx), %xmm8, %xmm8;
+	leaq 16 * 16(%rdx), %rdx;
+.align 4
 .Lctr_no_xor:
 	write_output(%xmm7, %xmm6, %xmm5, %xmm4, %xmm3, %xmm2, %xmm1, %xmm0,
 		     %xmm15, %xmm14, %xmm13, %xmm12, %xmm11, %xmm10, %xmm9,
 		     %xmm8, %rsi);
+
+	decq %r9;
+	leaq 16 * 16(%rsi), %rsi;
+	jnz .Lctr_loop;
 
 	ret;
