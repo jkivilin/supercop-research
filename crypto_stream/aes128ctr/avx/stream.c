@@ -36,7 +36,9 @@ static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t
 }
 
 /* IV must be little-endian, 'in' maybe set NULL */
-extern void aes_ctr_8way(struct aes_ctx_bitslice *ctx, void *out, const void *in, uint128_t *iv);
+extern void aes_ctr_8way(struct aes_ctx_bitslice *ctx, void *out,
+			 const void *in, uint128_t *iv,
+			 unsigned long num_of_chunks);
 
 int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
@@ -52,19 +54,21 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 	aes_init_bitslice(ctx, k, CRYPTO_KEYBYTES);
 	bswap128(&iv, (const uint128_t *)n); /* be => le */
 
-	while (likely(inlen >= PARALLEL_BLOCKS * BLOCKSIZE)) {
-		aes_ctr_8way(ctx, out, in, &iv);
+	if (likely(inlen >= PARALLEL_BLOCKS * BLOCKSIZE)) {
+		unsigned long chunks = inlen / (PARALLEL_BLOCKS * BLOCKSIZE);
 
-		inlen -= PARALLEL_BLOCKS * BLOCKSIZE;
-		out += PARALLEL_BLOCKS * BLOCKSIZE;
-		in += unlikely(in) ? PARALLEL_BLOCKS * BLOCKSIZE : 0;
+		aes_ctr_8way(ctx, out, in, &iv, chunks);
+
+		inlen -= chunks * PARALLEL_BLOCKS * BLOCKSIZE;
+		out += chunks * PARALLEL_BLOCKS * BLOCKSIZE;
+		in += unlikely(in) ? chunks * PARALLEL_BLOCKS * BLOCKSIZE : 0;
 	}
 
 	if (unlikely(inlen > 0)) {
 		uint128_t buf[PARALLEL_BLOCKS];
 		unsigned int i, j;
 
-		aes_ctr_8way(ctx, buf, NULL, &iv);
+		aes_ctr_8way(ctx, buf, NULL, &iv, 1);
 
 		if (in) {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {

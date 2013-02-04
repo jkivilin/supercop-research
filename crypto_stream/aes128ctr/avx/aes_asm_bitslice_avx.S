@@ -757,6 +757,8 @@ aes_avx_dec_blk8:
 	vpsubq tmp, x, x;
 
 #define load_ctr_8way(iv, bswap, x0, x1, x2, x3, x4, x5, x6, x7, t0, t1, t2) \
+	cmpq $(0xffffffffffffffff - 8), (iv); \
+	\
 	vpcmpeqd t0, t0, t0; \
 	vpsrldq $8, t0, t0; /* low: -1, high: 0 */ \
 	vmovdqa bswap, t1; \
@@ -765,6 +767,30 @@ aes_avx_dec_blk8:
 	vmovdqu (iv), x7; \
 	vpshufb t1, x7, x0; \
 	\
+	ja .Lload_ctr_carry; \
+	\
+	/* construct IVs */ \
+	vpsubq t0, x7, x7; \
+	vpshufb t1, x7, x1; \
+	vpsubq t0, x7, x7; \
+	vpshufb t1, x7, x2; \
+	vpsubq t0, x7, x7; \
+	vpshufb t1, x7, x3; \
+	vpsubq t0, x7, x7; \
+	vpshufb t1, x7, x4; \
+	vpsubq t0, x7, x7; \
+	vpshufb t1, x7, x5; \
+	vpsubq t0, x7, x7; \
+	vpshufb t1, x7, x6; \
+	vpsubq t0, x7, x7; \
+	vpsubq t0, x7, t2; \
+	vpshufb t1, x7, x7; \
+	vmovdqu t2, (iv); \
+	\
+	jmp .Lload_ctr_done; \
+	\
+.align 4; \
+.Lload_ctr_carry: \
 	/* construct IVs */ \
 	inc_le128(x7, t0, t2); \
 	vpshufb t1, x7, x1; \
@@ -782,7 +808,10 @@ aes_avx_dec_blk8:
 	vmovdqa x7, t2; \
 	vpshufb t1, x7, x7; \
 	inc_le128(t2, t0, t1); \
-	vmovdqu t2, (iv);
+	vmovdqu t2, (iv); \
+	\
+.align 4; \
+.Lload_ctr_done:;
 
 #define store_ctr_8way(src, dst, x0, x1, x2, x3, x4, x5, x6, x7) \
 	vpxor (0*16)(src), x0, x0; \
@@ -805,8 +834,13 @@ aes_ctr_8way:
 	 *	%rsi: dst
 	 *	%rdx: src
 	 *	%rcx: iv (little endian, 128bit)
+	 *	%r8: count, number of 8*16 byte chunks
 	 */
 
+	movq %r8, %r9;
+
+.align 4
+.Lctr_loop:
 	load_ctr_8way(%rcx, .Lbswap128_mask, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4,
 					     %xmm5, %xmm6, %xmm7, %xmm8, %xmm9,
 					     %xmm10);
@@ -819,12 +853,21 @@ aes_ctr_8way:
 	store_8way(%rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4, %xmm5, %xmm6,
 			 %xmm7);
 
+	decq %r9;
+	leaq (8*16)(%rsi), %rsi;
+	jnz .Lctr_loop;
+
 	ret;
 
-.align 8
+.align 4
 .Lctr_xor:
 	store_ctr_8way(%rdx, %rsi, %xmm0, %xmm1, %xmm2, %xmm3, %xmm4,
 				   %xmm5, %xmm6, %xmm7);
+
+	decq %r9;
+	leaq (8*16)(%rdx), %rdx;
+	leaq (8*16)(%rsi), %rsi;
+	jnz .Lctr_loop;
 
 	ret;
 
