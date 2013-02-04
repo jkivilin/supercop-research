@@ -1132,18 +1132,19 @@ camellia_ctr_16way:
 	 *	%r8: count, number of 16*16 byte chunks
 	 */
 	movq %r8, %r9;
+	movq %rcx, %r10;
 
 .align 4
 .Lctr_loop:
 	subq $(16 * 16), %rsp;
 	movq %rsp, %rax;
 
-	cmpq $(0xffffffffffffffff - 16), (%rcx);
+	cmpq $(0xffffffffffffffff - 16), (%r10);
 
 	vmovdqa .Lbswap128_mask, %xmm14;
 
 	/* load IV and byteswap */
-	vmovdqu (%rcx), %xmm0;
+	vmovdqu (%r10), %xmm0;
 	vpshufb %xmm14, %xmm0, %xmm15;
 	vmovdqu %xmm15, 15 * 16(%rax);
 
@@ -1186,7 +1187,7 @@ camellia_ctr_16way:
 	vpsubq %xmm15, %xmm0, %xmm0;
 	vpsubq %xmm15, %xmm0, %xmm13;
 	vpshufb %xmm14, %xmm0, %xmm0;
-	vmovdqu %xmm13, (%rcx);
+	vmovdqu %xmm13, (%r10);
 
 	jmp .Lload_ctr_done;
 
@@ -1227,7 +1228,7 @@ camellia_ctr_16way:
 	vmovdqa %xmm0, %xmm13;
 	vpshufb %xmm14, %xmm0, %xmm0;
 	inc_le128(%xmm13, %xmm15, %xmm14);
-	vmovdqu %xmm13, (%rcx);
+	vmovdqu %xmm13, (%r10);
 
 .align 4
 .Lload_ctr_done:
