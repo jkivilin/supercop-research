@@ -64,6 +64,7 @@ void ECRYPT_decrypt_packet(
 #endif
 
 static int flaginitialized = 0;
+static unsigned char zero_buf[1024*1024*8] = {0,};
 
 int crypto_stream(
   unsigned char *c,unsigned long long clen,
@@ -84,8 +85,8 @@ int crypto_stream(
   if (!flaginitialized) { ECRYPT_init(); flaginitialized = 1; }
   ECRYPT_keysetup(&ctx,k,crypto_stream_KEYBYTES * 8,crypto_stream_NONCEBYTES * 8);
   ECRYPT_ivsetup(&ctx,n);
-  for (i = 0;i < clen;++i) c[i] = 0;
-  ECRYPT_encrypt_bytes(&ctx,c,c,clen);
+  if (sizeof(zero_buf) < clen) return -1;
+  ECRYPT_encrypt_bytes(&ctx,zero_buf,c,clen);
   return 0;
 #endif
 }
