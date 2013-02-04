@@ -35,6 +35,17 @@ static inline void xor128(uint128_t *dst, const uint128_t *src1, const uint128_t
 	);
 }
 
+static inline void mov128(uint128_t *dst, const uint128_t *src)
+{
+	__asm__ (
+		"vmovdqu %[s], %%xmm0;\n"
+		"vmovdqu %%xmm0, %[d];\n"
+		: [d] "=m" (*dst)
+		: [s] "m" (*src)
+		: "xmm0", "memory"
+	);
+}
+
 /* IV must be little-endian, 'in' maybe set NULL */
 extern void aes_ctr_8way(struct aes_ctx_bitslice *ctx, void *out,
 			 const void *in, uint128_t *iv,
@@ -83,7 +94,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 				out[j] = in[j] ^ ((uint8_t*)&buf[i])[j];
 		} else {
 			for (i = 0; inlen >= BLOCKSIZE; i++) {
-				*(uint128_t *)out = buf[i];
+				mov128((uint128_t *)out, &buf[i]);
 
 				inlen -= BLOCKSIZE;
 				out += BLOCKSIZE;
