@@ -1,8 +1,6 @@
 #include <stdint.h>
 #include "aes.h"
 
-#define mulby2(x) ( ((x&0x7F) << 1) ^ (x & 0x80 ? 0x1B : 0) )
-
 const uint32_t sboxtables[4][256] = {
 	{
 		0x00000063, 0x0000007c, 0x00000077, 0x0000007b,
@@ -511,13 +509,26 @@ static inline uint32_t D(uint32_t x, uint32_t y)
 	return *(uint32_t*)&d[y];
 }
 
+static inline unsigned char mulby2(unsigned char x)
+{
+	signed char sx = x;
+
+	return (x << 1) ^ ((unsigned char)(sx >> 8) & 0x1B);
+}
+
 /*
  * Set up an aesctx. `keylen' is measured in bytes; each can be either
  * 16 (128-bit), 24 (192-bit), or 32 * (256-bit).
  */
-static void aes_setup(struct aes_ctx * ctx, const uint8_t *key, int keylen)
+static void aes_setup(struct aes_ctx * ctx, const uint8_t *key, int __keylen)
 {
-	int i, j, Nk, rconst;
+	unsigned int i, j, Nk;
+	unsigned char rconst;
+	const unsigned int keylen = 16;
+
+	/* Only accept keylen == 16 */
+	if (__keylen != 16 /*&& keylen != 24 && keylen != 32*/)
+		return;
 
 	/*
 	 * Basic parameters. Words per block, words in key, rounds.
@@ -533,45 +544,48 @@ static void aes_setup(struct aes_ctx * ctx, const uint8_t *key, int keylen)
 	/*
 	 * Now do the key setup itself.
 	 */
+	for (i = 0; i < Nk; i++)
+		ctx->keysched[i] = *(uint32_t*)(key + 4 * i);
+
+	j = Nk;
 	rconst = 1;
-	for (i = 0; i < (ctx->Nr + 1) * 4; i++) {
-		if (i < Nk)
-			ctx->keysched[i] = *(uint32_t*)(key + 4 * i);
-		else {
-			int a, b, c, d;
-			uint32_t temp = ctx->keysched[i - 1];
+	for (; i < (ctx->Nr + 1) * 4; i++, j++) {
+		unsigned int a, b, c, d;
+		uint32_t temp = ctx->keysched[i - 1];
 
-			if (i % Nk == 0) {
-				a = (temp >> 8) & 0xFF;
-				b = (temp >> 16) & 0xFF;
-				c = (temp >> 24) & 0xFF;
-				d = (temp >> 0) & 0xFF;
-				temp = Sbox(0, d);
-				temp |= Sbox(1, c);
-				temp |= Sbox(2, b);
-				temp |= Sbox(3, a) ^ rconst;
-				rconst = mulby2(rconst);
-			} else if (i % Nk == 4 && Nk > 6) {
-				a = (temp >> 0) & 0xFF;
-				b = (temp >> 8) & 0xFF;
-				c = (temp >> 16) & 0xFF;
-				d = (temp >> 24) & 0xFF;
-				temp = Sbox(0, d);
-				temp |= Sbox(1, c);
-				temp |= Sbox(2, b);
-				temp |= Sbox(3, a);
-			}
-
-			ctx->keysched[i] = ctx->keysched[i - Nk] ^ temp;
+		if (j == Nk) {
+			j = 0;
+			a = (temp >> 8) & 0xFF;
+			b = (temp >> 16) & 0xFF;
+			c = (temp >> 24) & 0xFF;
+			d = (temp >> 0) & 0xFF;
+			temp = Sbox(0, d);
+			temp |= Sbox(1, c);
+			temp |= Sbox(2, b);
+			temp |= Sbox(3, a) ^ rconst;
+			rconst = mulby2(rconst);
+		} else if (j == 4 && Nk > 6) {
+			a = (temp >> 0) & 0xFF;
+			b = (temp >> 8) & 0xFF;
+			c = (temp >> 16) & 0xFF;
+			d = (temp >> 24) & 0xFF;
+			temp = Sbox(0, d);
+			temp |= Sbox(1, c);
+			temp |= Sbox(2, b);
+			temp |= Sbox(3, a);
 		}
+
+		ctx->keysched[i] = ctx->keysched[i - Nk] ^ temp;
 	}
 
+/* Inverse cipher is unused since CTR-mode */
+#if 0
 	/*
 	 * Now prepare the modified keys for the inverse cipher.
 	 */
 	for (i = 0; i <= ctx->Nr; i++) {
 		for (j = 0; j < 4; j++) {
-			int a, b, c, d;
+			unsigned int a, b, c, d;
 			uint32_t temp = ctx->keysched[(ctx->Nr - i) * 4 + j];
 
 			if (i != 0 && i != ctx->Nr) {
@@ -595,6 +609,7 @@ static void aes_setup(struct aes_ctx * ctx, const uint8_t *key, int keylen)
 			ctx->invkeysched[i * 4 + j] = temp;
 		}
 	}
+#endif
 }
 
 extern void aes_keyshed_bitslice_avx(uint32_t *keysched, uint32_t* bitsliced_keysched);
