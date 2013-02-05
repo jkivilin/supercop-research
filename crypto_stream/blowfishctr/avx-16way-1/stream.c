@@ -30,6 +30,29 @@ static inline void xor64(uint64_t *dst, const uint64_t *src1, const uint64_t *sr
 	*dst = *src1 ^ *src2;
 }
 
+static inline void xor128(uint64_t *dst, const uint64_t *src1, const uint64_t *src2)
+{
+	__asm__ (
+		"vmovdqu %[s1], %%xmm0;\n"
+		"vpxor %[s2], %%xmm0, %%xmm0;\n"
+		"vmovdqu %%xmm0, %[d];\n"
+		: [d] "=m" (*dst)
+		: [s1] "m" (*src1), [s2] "m" (*src2)
+		: "xmm0", "memory"
+	);
+}
+
+static inline void mov128(uint64_t *dst, const uint64_t *src)
+{
+	__asm__ (
+		"vmovdqu %[s], %%xmm0;\n"
+		"vmovdqu %%xmm0, %[d];\n"
+		: [d] "=m" (*dst)
+		: [s] "m" (*src)
+		: "xmm0", "memory"
+	);
+}
+
 int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		      unsigned long long inlen, const unsigned char *n,
 		      const unsigned char *k)
@@ -56,8 +79,8 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		__blowfish_enc_blk_16way(ctx, out, (uint8_t *)ivs, 0);
 
 		if (unlikely(in)) {
-			for (i = 0; i < 16; i++)
-				xor64(&((uint64_t *)out)[i], &((uint64_t *)out)[i], &((uint64_t *)in)[i]);
+			for (i = 0; i < 16; i+=2)
+				xor128(&((uint64_t *)out)[i], &((uint64_t *)out)[i], &((uint64_t *)in)[i]);
 			in += BLOCKSIZE * 16;
 		}
 
@@ -81,22 +104,22 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 		__blowfish_enc_blk_16way(ctx, (uint8_t *)ivs, (uint8_t *)ivs, 0);
 
 		if (in) {
-			for (i = 0; inlen >= BLOCKSIZE; i++) {
-				xor64((uint64_t *)out, (uint64_t *)in, &ivs[i]);
+			for (i = 0; inlen >= 2*BLOCKSIZE; i+=2) {
+				xor128((uint64_t *)out, (uint64_t *)in, (uint64_t *)&ivs[i]);
 
-				inlen -= BLOCKSIZE;
-				in += BLOCKSIZE;
-				out += BLOCKSIZE;
+				inlen -= 2*BLOCKSIZE;
+				in += 2*BLOCKSIZE;
+				out += 2*BLOCKSIZE;
 			}
 
 			for (j = 0; j < inlen; j++)
 				out[j] = in[j] ^ ((uint8_t*)&ivs[i])[j];
 		} else {
-			for (i = 0; inlen >= BLOCKSIZE; i++) {
-				*(uint64_t *)out = ivs[i];
+			for (i = 0; inlen >= 2*BLOCKSIZE; i+=2) {
+				mov128((uint64_t *)out, (uint64_t *)&ivs[i]);
 
-				inlen -= BLOCKSIZE;
-				out += BLOCKSIZE;
+				inlen -= 2*BLOCKSIZE;
+				out += 2*BLOCKSIZE;
 			}
 
 			for (j = 0; j < inlen; j++)
