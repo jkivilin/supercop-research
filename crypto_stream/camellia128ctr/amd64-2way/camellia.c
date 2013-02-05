@@ -1092,6 +1092,7 @@ static void camellia_setup128(const unsigned char *key, uint64_t *subkey)
 	camellia_setup_tail(subkey, subRL, 24);
 }
 
+#if 0
 static void camellia_setup256(const unsigned char *key, uint64_t *subkey)
 {
 	uint64_t kl, kr;			/* left half of key */
@@ -1236,6 +1237,7 @@ static void camellia_setup192(const unsigned char *key, uint64_t *subkey)
 	memcpy(kk+24, (unsigned char *)&krr, 8);
 	camellia_setup256(kk, subkey);
 }
+#endif
 
 static int
 camellia_set_key(struct camellia_ctx *cctx, const uint8_t *in_key,
@@ -1253,12 +1255,14 @@ camellia_set_key(struct camellia_ctx *cctx, const uint8_t *in_key,
 	case 16:
 		camellia_setup128(key, cctx->key_table);
 		break;
+#if 0
 	case 24:
 		camellia_setup192(key, cctx->key_table);
 		break;
 	case 32:
 		camellia_setup256(key, cctx->key_table);
 		break;
+#endif
 	}
 
 	return 0;
