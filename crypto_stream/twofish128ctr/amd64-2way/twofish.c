@@ -382,7 +382,7 @@ static const uint8 exp_to_poly[492] = {
  * of the key uint8s, and w, x, y, and z, are the column of constants from
  * the RS matrix, preprocessed through the poly_to_exp table. */
 
-static void calc_s(uint8 ki, uint8 *a, uint8 *b, uint8 *c, uint8 *d, uint8 w, uint8 x, uint8 y, uint8 z)
+static inline void calc_s(uint8 ki, uint8 *a, uint8 *b, uint8 *c, uint8 *d, uint8 w, uint8 x, uint8 y, uint8 z)
 {
    uint8 tmp;
 
@@ -413,7 +413,7 @@ static void calc_s(uint8 ki, uint8 *a, uint8 *b, uint8 *c, uint8 *d, uint8 w, ui
    ctx->s[2][i] = mds[2][q1[(a) ^ sc] ^ sg]; \
    ctx->s[3][i] = mds[3][q1[(b) ^ sd] ^ sh]
 
-static void calc_sb(struct twofish_ctx *ctx,
+static inline void calc_sb(struct twofish_ctx *ctx,
 			uint32 i, uint8 a, uint8 b, uint8 c, uint8 d, uint8 e, uint8 f, uint8 g, uint8 h,
 			uint8 sa, uint8 sb, uint8 sc, uint8 sd, uint8 se, uint8 sf, uint8 sg, uint8 sh)
 {
@@ -441,7 +441,7 @@ static void calc_sb(struct twofish_ctx *ctx,
    ^ mds[2][q1[a ^ key[(j) + 10]] ^ key[(j) + 2]] \
    ^ mds[3][q1[b ^ key[(j) + 11]] ^ key[(j) + 3]]
 
-static void calc_k(const uint8 *key, uint32 *a, uint32 j, uint8 k, uint8 l, uint8 m, uint8 n)
+static inline void calc_k(const uint8 *key, uint32 *a, uint32 j, uint8 k, uint8 l, uint8 m, uint8 n)
 {
    uint32 x, y;
 
@@ -587,7 +587,7 @@ void twofish_init(struct twofish_ctx *ctx, const uint8_t key[], uint32_t keybyte
 	uint8 buf[16];
 	int i, j;
 
-	memset(ctx, 0, sizeof(*ctx));
+	/*memset(ctx, 0, sizeof(*ctx));*/
 
 	for (i = 0; i < 16;)
 		for (j = 0; j < keybytes && i < 16;)
@@ -595,4 +595,3 @@ void twofish_init(struct twofish_ctx *ctx, const uint8_t key[], uint32_t keybyte
 
 	(void)__twofish_setkey(ctx, buf, 16);
 }
-
