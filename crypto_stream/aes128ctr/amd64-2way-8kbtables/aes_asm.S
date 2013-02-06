@@ -1,10 +1,6 @@
 /**/
 #ifdef __x86_64
 
-//#define CORE2
-#define USE_2KB_TABLE
-//#define USE_1KB_SBOX
-
 .file "aes_asm.S"
 .text
 
@@ -19,44 +15,21 @@
 #define keysched	0
 #define invkeysched	((AES_MAX_NR + 1) * AES_MAX_NB * 4)
 #define nr		(((AES_MAX_NR + 1) * AES_MAX_NB * 4) * 2)
-#define counter		((((AES_MAX_NR + 1) * AES_MAX_NB * 4) * 2) + 4)
 
 // aes arrays
-#ifdef USE_2KB_TABLE
-	.extern aes_E64
+.extern aes_E32
+#define Emul 4
+#define E0 (aes_E32)
+#define E1 (aes_E32+4*256)
+#define E2 (aes_E32+2*4*256)
+#define E3 (aes_E32+3*4*256)
 
-	#define Emul 8
-	#define E0 (aes_E64+0)
-	#define E1 (aes_E64+3)
-	#define E2 (aes_E64+2)
-	#define E3 (aes_E64+1)
-#else
-	.extern aes_E32
-
-	#define Emul 4
-	#define E0 (aes_E32)
-	#define E1 (aes_E32+4*256)
-	#define E2 (aes_E32+2*4*256)
-	#define E3 (aes_E32+3*4*256)
-#endif
-
-#ifdef USE_1KB_SBOX
-	.extern sboxtables
-
-	#define Smul 4
-	#define Sbox0 (aes_Sbox+1)
-	#define Sbox1 (aes_Sbox+2)
-	#define Sbox2 (aes_Sbox+3)
-	#define Sbox3 (aes_Sbox+4)
-#else
-	.extern sboxtables
-
-	#define Smul 4
-	#define Sbox0 (sboxtables+(3*4*256))
-	#define Sbox1 (sboxtables+(2*4*256))
-	#define Sbox2 (sboxtables+(1*4*256))
-	#define Sbox3 (sboxtables+(0*4*256))
-#endif
+.extern sboxtables
+#define Smul 4
+#define Sbox0 (sboxtables+(3*4*256))
+#define Sbox1 (sboxtables+(2*4*256))
+#define Sbox2 (sboxtables+(1*4*256))
+#define Sbox3 (sboxtables+(0*4*256))
 
 // registers
 #define CTX %rdi

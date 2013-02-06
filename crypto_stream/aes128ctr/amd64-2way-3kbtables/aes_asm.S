@@ -1,10 +1,6 @@
 /**/
 #ifdef __x86_64
 
-//#define CORE2
-#define USE_2KB_TABLE
-//#define USE_1KB_SBOX
-
 .file "aes_asm.S"
 .text
 
@@ -22,41 +18,19 @@
 #define counter		((((AES_MAX_NR + 1) * AES_MAX_NB * 4) * 2) + 4)
 
 // aes arrays
-#ifdef USE_2KB_TABLE
-	.extern aes_E64
+.extern aes_E64
+#define Emul 8
+#define E0 (aes_E64+0)
+#define E1 (aes_E64+3)
+#define E2 (aes_E64+2)
+#define E3 (aes_E64+1)
 
-	#define Emul 8
-	#define E0 (aes_E64+0)
-	#define E1 (aes_E64+3)
-	#define E2 (aes_E64+2)
-	#define E3 (aes_E64+1)
-#else
-	.extern aes_E32
-
-	#define Emul 4
-	#define E0 (aes_E32)
-	#define E1 (aes_E32+4*256)
-	#define E2 (aes_E32+2*4*256)
-	#define E3 (aes_E32+3*4*256)
-#endif
-
-#ifdef USE_1KB_SBOX
-	.extern sboxtables
-
-	#define Smul 4
-	#define Sbox0 (aes_Sbox+1)
-	#define Sbox1 (aes_Sbox+2)
-	#define Sbox2 (aes_Sbox+3)
-	#define Sbox3 (aes_Sbox+4)
-#else
-	.extern sboxtables
-
-	#define Smul 4
-	#define Sbox0 (sboxtables+(3*4*256))
-	#define Sbox1 (sboxtables+(2*4*256))
-	#define Sbox2 (sboxtables+(1*4*256))
-	#define Sbox3 (sboxtables+(0*4*256))
-#endif
+.extern sboxtable
+#define Smul 4
+#define Sbox0 (sboxtable+1)
+#define Sbox1 (sboxtable+2)
+#define Sbox2 (sboxtable+3)
+#define Sbox3 (sboxtable+4)
 
 // registers
 #define CTX %rdi
@@ -401,14 +375,15 @@ aes_get_counter_cache:
 	ret;
 
 .align 4
-.global aes_enc_blk
-.type   aes_enc_blk,@function;
+.global asm_aes_encrypt1X
+.type   asm_aes_encrypt1X,@function;
 
-aes_enc_blk:
+asm_aes_encrypt1X:
 	// input:
 	//	%rdi: ctx,  CTX
-	//	%rsi: out... multiple blocks
-	//	%rdx: in... multiple blocks
+	//	%rsi: in... multiple blocks
+	//	%rdx: out... multiple blocks
+	//	%rcx: block count
 	pushq %rbp;
 	pushq %rbx;
 	pushq %r12;
@@ -416,79 +391,22 @@ aes_enc_blk:
 	pushq %r14;
 	pushq %r15;
 
-	pushq %rsi; // out
+#define STACK_OUT -24(%rsp)
+#define STACK_IN -16(%rsp)
+#define STACK_COUNT -8(%rsp)
 
-	movq %rdx, RIO0; // in1
+	movq %rdx, STACK_OUT;
+
+___enc1_loop:
+	movq %rcx, STACK_COUNT;
+	movq %rsi, STACK_IN;
+
+	movq %rsi, RIO0; // in1
 	loadblock1(RIO, RA, RB);
 
 	addroundkey1(0, RA, RB);
 	encround1(1, RA, RB);
 	encround1(2, RA, RB);
-
-	jmp .L___enc1_tail;
-
-.align 4
-.global aes_enc_blk_ctr_cached
-.type   aes_enc_blk_ctr_cached,@function;
-
-aes_enc_blk_ctr_cached:
-	// input:
-	//	%rdi: ctx, CTX
-	//	%rsi: out, two blocks
-	//	%rdx: ctr_cache
-	//	%cl: counter byte
-
-	pushq %rbp;
-	pushq %rbx;
-	pushq %r12;
-	pushq %r13;
-	pushq %r14;
-	pushq %r15;
-	pushq %rsi; // out
-
-	movq %rdx, %rsi;
-
-	// load data to free registers for use (avoid using RX0 = %rsi)
-	movzbl %cl, RLA0d;
-	movl 16(%rsi), RA0d;
-
-	// partial round0
-	movl keysched+4*4(CTX), RX1d;
-	movzbl keysched+15(CTX), RHA0d;
-
-	// E(3, (a[3] ^ key) & 0xFF)
-	xorl RHA0d, RLA0d;
-	xorl E3(,RLA0,Emul), RA0d;
-
-	movq (%rsi), RHA0;
-	movq 8(%rsi), RHB0;
-
-	// partial round 1
-	xorl RX1d, RA0d;
-
-	/* block[0] ^=         E(0, b[0] & 0xFF)      ; b[0] >>= 8; */
-	/* block[1] ^= (uint64)E(1, b[0] & 0xFF) << 32; b[0] >>= 8; */
-	movzbl RA0bl, RX0d;
-	movzbl RA0bh, RX1d;
-	movl E0(,RX0,Emul), RX0d;
-	movl E1(,RX1,Emul), RX1d;
-	shrl $16, RA0d;
-	shlq $32, RX1;
-	xorq RX0, RHA0;
-	xorq RX1, RHB0;
-
-	/* block[1] ^=         E(2, b[0] & 0xFF)      ; b[0] >>= 8; */
-	/* block[0] ^= (uint64)E(3, b[0] & 0xFF) << 32; */
-	movzbl RA0bl, RX0d;
-	movzbl RA0bh, RX1d;
-	movl E2(,RX0,Emul), RB0d;
-	movl E3(,RX1,Emul), RA0d;
-	shlq $32, RA0;
-	xorq RHA0, RA0;
-	xorq RHB0, RB0;
-
-.align 4
-.L___enc1_tail:
 	encround1(3, RA, RB);
 	encround1(4, RA, RB);
 	encround1(5, RA, RB);
@@ -498,14 +416,23 @@ aes_enc_blk_ctr_cached:
 	encround1(9, RA, RB);
 
 	cmp $12, nr(CTX);
-	jae .L___enc1_keylen_over_or_eq_12;
+	jae ___enc1_keylen_over_or_eq_12;
 
 	enclastround1(10, RA, RB);
 
 .align 4
-.L___enc1_exit:
-	popq RIO0; // out
+___enc1_exit:
+	movq STACK_OUT, RIO0;		// outX
 	saveblock1(RIO, RA, RB);
+
+	addq $(4*4), RIO0;		// outX + 1
+	movq RIO0, STACK_OUT;
+
+	movq STACK_IN, %rsi;
+	addq $(4*4), %rsi;		// inX + 1
+	movq STACK_COUNT, %rcx;		
+	subl $1, %ecx;			// count - 1
+	jnz ___enc1_loop;
 
 	popq %r15;
 	popq %r14;
@@ -517,8 +444,8 @@ aes_enc_blk_ctr_cached:
 	ret;
 
 .align 4
-.L___enc1_keylen_over_or_eq_12:
-	je .L___enc1_keylen_eq_12;
+___enc1_keylen_over_or_eq_12:
+	je ___enc1_keylen_eq_12;
 
 	encround1(10, RA, RB);
 	encround1(11, RA, RB);
@@ -526,16 +453,20 @@ aes_enc_blk_ctr_cached:
 	encround1(13, RA, RB);
 	enclastround1(14, RA, RB);
 
-	jmp .L___enc1_exit;
+	jmp ___enc1_exit;
 
 .align 4
-.L___enc1_keylen_eq_12:
+___enc1_keylen_eq_12:
 
 	encround1(10, RA, RB);
 	encround1(11, RA, RB);
 	enclastround1(12, RA, RB);
 
-	jmp .L___enc1_exit;
+	jmp ___enc1_exit;
+
+#undef STACK_OUT
+#undef STACK_IN
+#undef STACK_COUNT
 
 /********************* TWO BLOCKS PART *********************/
 
