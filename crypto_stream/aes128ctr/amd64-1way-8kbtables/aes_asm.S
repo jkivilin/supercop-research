@@ -94,43 +94,6 @@
 #define RHA1b %r12b
 #define RHB1b %r13b
 
-#define print_reg(reg1, reg2) \
-	subq $100, %rsp; \
-	pushq %rax; \
-	pushq %rbx; \
-	pushq %rcx; \
-	pushq %rdx; \
-	pushq %rdi; \
-	pushq %rsi; \
-	pushq %rbp; \
-	pushq %r8; \
-	pushq %r9; \
-	pushq %r10; \
-	pushq %r11; \
-	pushq %r12; \
-	pushq %r13; \
-	pushq %r14; \
-	pushq %r15; \
-	movq reg1, %rdi; \
-	movq reg2, %rsi; \
-	call print_asmreg; \
-	popq %r15; \
-	popq %r14; \
-	popq %r13; \
-	popq %r12; \
-	popq %r11; \
-	popq %r10; \
-	popq %r9; \
-	popq %r8; \
-	popq %rbp; \
-	popq %rsi; \
-	popq %rdi; \
-	popq %rdx; \
-	popq %rcx; \
-	popq %rbx; \
-	popq %rax; \
-	addq $100, %rsp;
-
 #define do16bit(op, source, tablemul, table1, dest1, table2, dest2, t0, t1) \
 	movzbl source ## bh,		t1 ## d; \
 	movzbl source ## bl,		t0 ## d; \
@@ -536,7 +499,7 @@ aes_enc_blk_ctr_cached:
 	xorq keysched+((w)*4+2)*4(CTX),	b ## 0; \
 	xorq keysched+((w)*4+2)*4(CTX),	b ## 1;
 
-/* Interleaving here kills performance, don't do it! */
+/* Too much interleaving here kills performance, don't do it! */
 #define encround_begin2(a, b) \
 	/* new_l[0] = E(0, a[0] & 0xFF); */ \
 	/* new_h[1] = E(1, a[0] & 0xFF); */ \
