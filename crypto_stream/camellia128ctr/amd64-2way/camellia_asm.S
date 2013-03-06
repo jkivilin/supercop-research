@@ -1,3 +1,20 @@
+/* camellia_asm.S ver 1.1
+ *
+ * Copyright © 2012-2013 Jussi Kivilinna <jussi.kivilinna@iki.fi>
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
 .file "camellia_asm.S"
 .text
 
@@ -193,20 +210,17 @@
 	bswapq				RAB0; \
 	movq RAB0,			4*2(RIO);
 
-#if 0
-.global __camellia_encrypt_asm_xor;
-.type   __camellia_encrypt_asm_xor,@function;
+.global camellia_encrypt_asm;
+.type   camellia_encrypt_asm,@function;
 
-__camellia_encrypt_asm_xor:
+camellia_encrypt_asm:
 	/* input:
 	 *	%rdi: ctx, CTX
 	 *	%rsi: dst
 	 *	%rdx: src
-	 *	%rcx: bool xor
 	 */
 	movq %rbp, RRBP;
 
-	movq %rcx, RXOR;
 	movq %rsi, RDST;
 	movq %rdx, RIO;
 
@@ -227,26 +241,17 @@ __camellia_encrypt_asm_xor:
 	movl $32, RT1d; /* max */
 
 __enc_done:
-	testb RXORbl, RXORbl;
 	movq RDST, RIO;
-
-	jnz __enc_xor;
 
 	enc_outunpack(mov, RT1);
 
 	movq RRBP, %rbp;
 	ret;
 
-__enc_xor:
-	enc_outunpack(xor, RT1);
+.global camellia_decrypt_asm;
+.type   camellia_decrypt_asm,@function;
 
-	movq RRBP, %rbp;
-	ret;
-
-.global __camellia_decrypt_asm;
-.type   __camellia_decrypt_asm,@function;
-
-__camellia_decrypt_asm:
+camellia_decrypt_asm:
 	/* input:
 	 *	%rdi: ctx, CTX
 	 *	%rsi: dst
@@ -282,7 +287,6 @@ __dec_rounds16:
 
 	movq RRBP, %rbp;
 	ret;
-#endif
 
 /**********************************************************************
   2-way camellia

@@ -1,3 +1,34 @@
+/*
+ * aes.c - implementation of AES / Rijndael, from PuTTY (and heavily modified)
+ */
+/*
+ * Original license:
+ *
+ *  PuTTY is copyright 1997-2012 Simon Tatham.
+ *
+ *  Portions copyright Robert de Bath, Joris van Rantwijk, Delian Delchev,
+ *  Andreas Schultz, Jeroen Massar, Wez Furlong, Nicolas Barry, Justin Bradford,
+ *  Ben Harris, Malcolm Smith, Ahmad Khalifa, Markus Kuhn, Colin Watson, and
+ *  CORE SDI S.A.
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a
+ *  copy of this software and associated documentation files (the "Software"),
+ *  to deal in the Software without restriction, including without limitation
+ *  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ *  and/or sell copies of the Software, and to permit persons to whom the
+ *  Software is furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included
+ *  in all copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ *  SIMON TATHAM BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ *  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ *  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #include <stdint.h>
 #include "aes.h"
 
@@ -177,143 +208,6 @@ static inline uint32_t E(uint32_t x, uint32_t y)
 	return *(uint32_t*)&e[y];
 }
 
-const uint32_t aes_D64[256 * 2] = {
-	0x51f4a750, 0x00f4a750, 0x7e416553, 0x00416553,
-	0x1a17a4c3, 0x0017a4c3, 0x3a275e96, 0x00275e96,
-	0x3bab6bcb, 0x00ab6bcb, 0x1f9d45f1, 0x009d45f1,
-	0xacfa58ab, 0x00fa58ab, 0x4be30393, 0x00e30393,
-	0x2030fa55, 0x0030fa55, 0xad766df6, 0x00766df6,
-	0x88cc7691, 0x00cc7691, 0xf5024c25, 0x00024c25,
-	0x4fe5d7fc, 0x00e5d7fc, 0xc52acbd7, 0x002acbd7,
-	0x26354480, 0x00354480, 0xb562a38f, 0x0062a38f,
-	0xdeb15a49, 0x00b15a49, 0x25ba1b67, 0x00ba1b67,
-	0x45ea0e98, 0x00ea0e98, 0x5dfec0e1, 0x00fec0e1,
-	0xc32f7502, 0x002f7502, 0x814cf012, 0x004cf012,
-	0x8d4697a3, 0x004697a3, 0x6bd3f9c6, 0x00d3f9c6,
-	0x038f5fe7, 0x008f5fe7, 0x15929c95, 0x00929c95,
-	0xbf6d7aeb, 0x006d7aeb, 0x955259da, 0x005259da,
-	0xd4be832d, 0x00be832d, 0x587421d3, 0x007421d3,
-	0x49e06929, 0x00e06929, 0x8ec9c844, 0x00c9c844,
-	0x75c2896a, 0x00c2896a, 0xf48e7978, 0x008e7978,
-	0x99583e6b, 0x00583e6b, 0x27b971dd, 0x00b971dd,
-	0xbee14fb6, 0x00e14fb6, 0xf088ad17, 0x0088ad17,
-	0xc920ac66, 0x0020ac66, 0x7dce3ab4, 0x00ce3ab4,
-	0x63df4a18, 0x00df4a18, 0xe51a3182, 0x001a3182,
-	0x97513360, 0x00513360, 0x62537f45, 0x00537f45,
-	0xb16477e0, 0x006477e0, 0xbb6bae84, 0x006bae84,
-	0xfe81a01c, 0x0081a01c, 0xf9082b94, 0x00082b94,
-	0x70486858, 0x00486858, 0x8f45fd19, 0x0045fd19,
-	0x94de6c87, 0x00de6c87, 0x527bf8b7, 0x007bf8b7,
-	0xab73d323, 0x0073d323, 0x724b02e2, 0x004b02e2,
-	0xe31f8f57, 0x001f8f57, 0x6655ab2a, 0x0055ab2a,
-	0xb2eb2807, 0x00eb2807, 0x2fb5c203, 0x00b5c203,
-	0x86c57b9a, 0x00c57b9a, 0xd33708a5, 0x003708a5,
-	0x302887f2, 0x002887f2, 0x23bfa5b2, 0x00bfa5b2,
-	0x02036aba, 0x00036aba, 0xed16825c, 0x0016825c,
-	0x8acf1c2b, 0x00cf1c2b, 0xa779b492, 0x0079b492,
-	0xf307f2f0, 0x0007f2f0, 0x4e69e2a1, 0x0069e2a1,
-	0x65daf4cd, 0x00daf4cd, 0x0605bed5, 0x0005bed5,
-	0xd134621f, 0x0034621f, 0xc4a6fe8a, 0x00a6fe8a,
-	0x342e539d, 0x002e539d, 0xa2f355a0, 0x00f355a0,
-	0x058ae132, 0x008ae132, 0xa4f6eb75, 0x00f6eb75,
-	0x0b83ec39, 0x0083ec39, 0x4060efaa, 0x0060efaa,
-	0x5e719f06, 0x00719f06, 0xbd6e1051, 0x006e1051,
-	0x3e218af9, 0x00218af9, 0x96dd063d, 0x00dd063d,
-	0xdd3e05ae, 0x003e05ae, 0x4de6bd46, 0x00e6bd46,
-	0x91548db5, 0x00548db5, 0x71c45d05, 0x00c45d05,
-	0x0406d46f, 0x0006d46f, 0x605015ff, 0x005015ff,
-	0x1998fb24, 0x0098fb24, 0xd6bde997, 0x00bde997,
-	0x894043cc, 0x004043cc, 0x67d99e77, 0x00d99e77,
-	0xb0e842bd, 0x00e842bd, 0x07898b88, 0x00898b88,
-	0xe7195b38, 0x00195b38, 0x79c8eedb, 0x00c8eedb,
-	0xa17c0a47, 0x007c0a47, 0x7c420fe9, 0x00420fe9,
-	0xf8841ec9, 0x00841ec9, 0x00000000, 0x00000000,
-	0x09808683, 0x00808683, 0x322bed48, 0x002bed48,
-	0x1e1170ac, 0x001170ac, 0x6c5a724e, 0x005a724e,
-	0xfd0efffb, 0x000efffb, 0x0f853856, 0x00853856,
-	0x3daed51e, 0x00aed51e, 0x362d3927, 0x002d3927,
-	0x0a0fd964, 0x000fd964, 0x685ca621, 0x005ca621,
-	0x9b5b54d1, 0x005b54d1, 0x24362e3a, 0x00362e3a,
-	0x0c0a67b1, 0x000a67b1, 0x9357e70f, 0x0057e70f,
-	0xb4ee96d2, 0x00ee96d2, 0x1b9b919e, 0x009b919e,
-	0x80c0c54f, 0x00c0c54f, 0x61dc20a2, 0x00dc20a2,
-	0x5a774b69, 0x00774b69, 0x1c121a16, 0x00121a16,
-	0xe293ba0a, 0x0093ba0a, 0xc0a02ae5, 0x00a02ae5,
-	0x3c22e043, 0x0022e043, 0x121b171d, 0x001b171d,
-	0x0e090d0b, 0x00090d0b, 0xf28bc7ad, 0x008bc7ad,
-	0x2db6a8b9, 0x00b6a8b9, 0x141ea9c8, 0x001ea9c8,
-	0x57f11985, 0x00f11985, 0xaf75074c, 0x0075074c,
-	0xee99ddbb, 0x0099ddbb, 0xa37f60fd, 0x007f60fd,
-	0xf701269f, 0x0001269f, 0x5c72f5bc, 0x0072f5bc,
-	0x44663bc5, 0x00663bc5, 0x5bfb7e34, 0x00fb7e34,
-	0x8b432976, 0x00432976, 0xcb23c6dc, 0x0023c6dc,
-	0xb6edfc68, 0x00edfc68, 0xb8e4f163, 0x00e4f163,
-	0xd731dcca, 0x0031dcca, 0x42638510, 0x00638510,
-	0x13972240, 0x00972240, 0x84c61120, 0x00c61120,
-	0x854a247d, 0x004a247d, 0xd2bb3df8, 0x00bb3df8,
-	0xaef93211, 0x00f93211, 0xc729a16d, 0x0029a16d,
-	0x1d9e2f4b, 0x009e2f4b, 0xdcb230f3, 0x00b230f3,
-	0x0d8652ec, 0x008652ec, 0x77c1e3d0, 0x00c1e3d0,
-	0x2bb3166c, 0x00b3166c, 0xa970b999, 0x0070b999,
-	0x119448fa, 0x009448fa, 0x47e96422, 0x00e96422,
-	0xa8fc8cc4, 0x00fc8cc4, 0xa0f03f1a, 0x00f03f1a,
-	0x567d2cd8, 0x007d2cd8, 0x223390ef, 0x003390ef,
-	0x87494ec7, 0x00494ec7, 0xd938d1c1, 0x0038d1c1,
-	0x8ccaa2fe, 0x00caa2fe, 0x98d40b36, 0x00d40b36,
-	0xa6f581cf, 0x00f581cf, 0xa57ade28, 0x007ade28,
-	0xdab78e26, 0x00b78e26, 0x3fadbfa4, 0x00adbfa4,
-	0x2c3a9de4, 0x003a9de4, 0x5078920d, 0x0078920d,
-	0x6a5fcc9b, 0x005fcc9b, 0x547e4662, 0x007e4662,
-	0xf68d13c2, 0x008d13c2, 0x90d8b8e8, 0x00d8b8e8,
-	0x2e39f75e, 0x0039f75e, 0x82c3aff5, 0x00c3aff5,
-	0x9f5d80be, 0x005d80be, 0x69d0937c, 0x00d0937c,
-	0x6fd52da9, 0x00d52da9, 0xcf2512b3, 0x002512b3,
-	0xc8ac993b, 0x00ac993b, 0x10187da7, 0x00187da7,
-	0xe89c636e, 0x009c636e, 0xdb3bbb7b, 0x003bbb7b,
-	0xcd267809, 0x00267809, 0x6e5918f4, 0x005918f4,
-	0xec9ab701, 0x009ab701, 0x834f9aa8, 0x004f9aa8,
-	0xe6956e65, 0x00956e65, 0xaaffe67e, 0x00ffe67e,
-	0x21bccf08, 0x00bccf08, 0xef15e8e6, 0x0015e8e6,
-	0xbae79bd9, 0x00e79bd9, 0x4a6f36ce, 0x006f36ce,
-	0xea9f09d4, 0x009f09d4, 0x29b07cd6, 0x00b07cd6,
-	0x31a4b2af, 0x00a4b2af, 0x2a3f2331, 0x003f2331,
-	0xc6a59430, 0x00a59430, 0x35a266c0, 0x00a266c0,
-	0x744ebc37, 0x004ebc37, 0xfc82caa6, 0x0082caa6,
-	0xe090d0b0, 0x0090d0b0, 0x33a7d815, 0x00a7d815,
-	0xf104984a, 0x0004984a, 0x41ecdaf7, 0x00ecdaf7,
-	0x7fcd500e, 0x00cd500e, 0x1791f62f, 0x0091f62f,
-	0x764dd68d, 0x004dd68d, 0x43efb04d, 0x00efb04d,
-	0xccaa4d54, 0x00aa4d54, 0xe49604df, 0x009604df,
-	0x9ed1b5e3, 0x00d1b5e3, 0x4c6a881b, 0x006a881b,
-	0xc12c1fb8, 0x002c1fb8, 0x4665517f, 0x0065517f,
-	0x9d5eea04, 0x005eea04, 0x018c355d, 0x008c355d,
-	0xfa877473, 0x00877473, 0xfb0b412e, 0x000b412e,
-	0xb3671d5a, 0x00671d5a, 0x92dbd252, 0x00dbd252,
-	0xe9105633, 0x00105633, 0x6dd64713, 0x00d64713,
-	0x9ad7618c, 0x00d7618c, 0x37a10c7a, 0x00a10c7a,
-	0x59f8148e, 0x00f8148e, 0xeb133c89, 0x00133c89,
-	0xcea927ee, 0x00a927ee, 0xb761c935, 0x0061c935,
-	0xe11ce5ed, 0x001ce5ed, 0x7a47b13c, 0x0047b13c,
-	0x9cd2df59, 0x00d2df59, 0x55f2733f, 0x00f2733f,
-	0x1814ce79, 0x0014ce79, 0x73c737bf, 0x00c737bf,
-	0x53f7cdea, 0x00f7cdea, 0x5ffdaa5b, 0x00fdaa5b,
-	0xdf3d6f14, 0x003d6f14, 0x7844db86, 0x0044db86,
-	0xcaaff381, 0x00aff381, 0xb968c43e, 0x0068c43e,
-	0x3824342c, 0x0024342c, 0xc2a3405f, 0x00a3405f,
-	0x161dc372, 0x001dc372, 0xbce2250c, 0x00e2250c,
-	0x283c498b, 0x003c498b, 0xff0d9541, 0x000d9541,
-	0x39a80171, 0x00a80171, 0x080cb3de, 0x000cb3de,
-	0xd8b4e49c, 0x00b4e49c, 0x6456c190, 0x0056c190,
-	0x7bcb8461, 0x00cb8461, 0xd532b670, 0x0032b670,
-	0x486c5c74, 0x006c5c74, 0xd0b85742, 0x00b85742,
-};
-
-static inline uint32_t D(uint32_t x, uint32_t y)
-{
-	const uint64_t *d = (const uint64_t *)((const uint8_t*)aes_D64 + x);
-	return *(uint32_t*)&d[y];
-}
-
 static inline unsigned char mulby2(unsigned char x)
 {
 	signed char sx = x;
@@ -422,212 +316,3 @@ void aes_init(struct aes_ctx * ctx, const uint8_t *key, int keylen)
 	aes_setup(ctx, key, keylen);
 }
 
-#define ADD_ROUND_KEY_4(b,w) ( { \
-		b[0] ^= *(keysched + (w)*4); \
-		b[1] ^= *(keysched + (w)*4 + 1); \
-		b[2] ^= *(keysched + (w)*4 + 2); \
-		b[3] ^= *(keysched + (w)*4 + 3); \
-	} )
-#define MOVEWORD(b, n, i) ({ b[i] = n[i]; })
-
-/*
- * Macros for the encryption routine.
- */
-#define MAKEWORD(b, n, i) ( { \
-		const int C1 = 1, C2 = 2, C3 = 3; \
-		n[i] = E(0, (b[i] >> 0) & 0xFF) ^ \
-			E(1, (b[(i+C1)&3] >> 8) & 0xFF) ^ \
-			E(2, (b[(i+C2)&3] >> 16) & 0xFF) ^ \
-			E(3, (b[(i+C3)&3] >> 24) & 0xFF); \
-	} )
-#define LASTWORD(b, n, i) ( { \
-		const int C1 = 1, C2 = 2, C3 = 3; \
-		n[i] = (Sbox(3, (b[i] >> 0) & 0xFF)) | \
-			(Sbox(2, (b[(i+C1)&3] >> 8) & 0xFF)) | \
-			(Sbox(1, (b[(i+C2)&3] >> 16) & 0xFF)) | \
-			(Sbox(0, (b[(i+C3)&3] >> 24) & 0xFF)); \
-	} )
-
-#define ROUND_NOKEY(a, b) ( { \
-		MAKEWORD(a, b, 0); \
-		MAKEWORD(a, b, 1); \
-		MAKEWORD(a, b, 2); \
-		MAKEWORD(a, b, 3); \
-	} )
-
-#define ROUND(w, a, b) ( { \
-		ADD_ROUND_KEY_4(a, w); \
-		\
-		ROUND_NOKEY(a, b); \
-	} )
-
-#define LASTROUND(w, a, b) ( { \
-		\
-		ADD_ROUND_KEY_4(a, w); \
-		\
-		LASTWORD(a, b, 0); \
-		LASTWORD(a, b, 1); \
-		LASTWORD(a, b, 2); \
-		LASTWORD(a, b, 3); \
-		\
-		ADD_ROUND_KEY_4(b, w + 1); \
-	} )
-
-void aes_encrypt(struct aes_ctx *ctx, uint32_t out[4], const uint32_t in[4])
-{
-	const uint32_t *keysched = ctx->keysched;
-	uint32_t a[4], b[4];
-
-	a[0] = in[0];
-	a[1] = in[1];
-	a[2] = in[2];
-	a[3] = in[3];
-
-	ROUND(0, a, b);
-	ROUND(1, b, a);
-	ROUND(2, a, b);
-	ROUND(3, b, a);
-	ROUND(4, a, b);
-	ROUND(5, b, a);
-	ROUND(6, a, b);
-	ROUND(7, b, a);
-	ROUND(8, a, b);
-	if ((ctx->Nr < 12)) {
-		LASTROUND(9, b, a);
-	} else if (ctx->Nr == 12) {
-		ROUND(9, b, a);
-		ROUND(10, a, b);
-		LASTROUND(11, b, a);
-	} else {
-		ROUND(9, b, a);
-		ROUND(10, a, b);
-		ROUND(11, b, a);
-		ROUND(12, a, b);
-		LASTROUND(13, b, a);
-	}
-
-	out[0] = a[0];
-	out[1] = a[1];
-	out[2] = a[2];
-	out[3] = a[3];
-}
-
-void aes_get_ctr_cache(struct aes_ctx *ctx, uint32_t ctr_cache[5], uint32_t iv[4])
-{
-	const uint32_t *keysched = ctx->keysched;
-	const uint32_t *ctr_match = iv;
-	uint32_t a[4], b[4];
-
-	a[0] = ctr_match[0];
-	a[1] = ctr_match[1];
-	a[2] = ctr_match[2];
-	a[3] = ctr_match[3];
-
-	ADD_ROUND_KEY_4(a, 0);
-
-	b[0] = E(0, a[0] & 0xFF); a[0] >>= 8;
-	b[1] = E(0, a[1] & 0xFF); a[1] >>= 8;
-	b[2] = E(0, a[2] & 0xFF); a[2] >>= 8;
-	b[3] = E(0, a[3] & 0xFF); a[3] >>= 8;
-
-	b[3] ^= E(1, a[0] & 0xFF); a[0] >>= 8;
-	b[0] ^= E(1, a[1] & 0xFF); a[1] >>= 8;
-	b[1] ^= E(1, a[2] & 0xFF); a[2] >>= 8;
-	b[2] ^= E(1, a[3] & 0xFF); a[3] >>= 8;
-
-	b[2] ^= E(2, a[0] & 0xFF); a[0] >>= 8;
-	b[3] ^= E(2, a[1] & 0xFF); a[1] >>= 8;
-	b[0] ^= E(2, a[2] & 0xFF); a[2] >>= 8;
-	b[1] ^= E(2, a[3] & 0xFF); a[3] >>= 8;
-
-	b[1] ^= E(3, a[0]);
-	b[2] ^= E(3, a[1]);
-	b[3] ^= E(3, a[2]);
-	b[0] ^= 0/*E(3, a[3])*/;
-
-	ctr_cache[4] = b[0];
-	b[0] = 0;
-
-	ADD_ROUND_KEY_4(b, 1);
-
-	//a[0] = E(0, b[0] & 0xFF); b[0] >>= 8;
-	a[1] = E(0, b[1] & 0xFF); b[1] >>= 8;
-	a[2] = E(0, b[2] & 0xFF); b[2] >>= 8;
-	a[3] = E(0, b[3] & 0xFF); b[3] >>= 8;
-
-	//a[3] ^= E(1, b[0] & 0xFF); b[0] >>= 8;
-	a[0] = E(1, b[1] & 0xFF); b[1] >>= 8;
-	a[1] ^= E(1, b[2] & 0xFF); b[2] >>= 8;
-	a[2] ^= E(1, b[3] & 0xFF); b[3] >>= 8;
-
-	//a[2] ^= E(2, b[0] & 0xFF); b[0] >>= 8;
-	a[3] ^= E(2, b[1] & 0xFF); b[1] >>= 8;
-	a[0] ^= E(2, b[2] & 0xFF); b[2] >>= 8;
-	a[1] ^= E(2, b[3] & 0xFF); b[3] >>= 8;
-
-	//a[1] ^= E(3, b[0]);
-	a[2] ^= E(3, b[1]);
-	a[3] ^= E(3, b[2]);
-	a[0] ^= E(3, b[3]);
-
-	ADD_ROUND_KEY_4(a, 2);
-
-	ctr_cache[0] = a[0];
-	ctr_cache[1] = a[1];
-	ctr_cache[2] = a[2];
-	ctr_cache[3] = a[3];
-}
-
-void aes_ctr_match_encrypt(struct aes_ctx *ctx, uint32_t out[4], const uint32_t ctr_cache[5], unsigned char counter)
-{
-	const uint32_t *keysched = ctx->keysched;
-	uint32_t a[4], b[4];
-	uint32_t ctr;
-
-	// round 0
-	ctr = counter & 0xff;
-
-	b[0] = ctr_cache[4];
-
-	ctr ^= (keysched[3] >> 24) & 0xff;
-	b[0] ^= E(3, ctr);
-
-	// round 1
-	b[0] ^= *(keysched + 4);
-
-	a[0] = ctr_cache[0];
-	a[1] = ctr_cache[1];
-	a[2] = ctr_cache[2];
-	a[3] = ctr_cache[3];
-
-	a[0] ^= E(0, b[0] & 0xFF); b[0] >>= 8;
-	a[3] ^= E(1, b[0] & 0xFF); b[0] >>= 8;
-	a[2] ^= E(2, b[0] & 0xFF); b[0] >>= 8;
-	a[1] ^= E(3, b[0] & 0xFF);
-
-	ROUND_NOKEY(a, b);
-	ROUND(3, b, a);
-	ROUND(4, a, b);
-	ROUND(5, b, a);
-	ROUND(6, a, b);
-	ROUND(7, b, a);
-	ROUND(8, a, b);
-	if ((ctx->Nr < 12)) {
-		LASTROUND(9, b, a);
-	} else if (ctx->Nr == 12) {
-		ROUND(9, b, a);
-		ROUND(10, a, b);
-		LASTROUND(11, b, a);
-	} else {
-		ROUND(9, b, a);
-		ROUND(10, a, b);
-		ROUND(11, b, a);
-		ROUND(12, a, b);
-		LASTROUND(13, b, a);
-	}
-
-	out[0] = a[0];
-	out[1] = a[1];
-	out[2] = a[2];
-	out[3] = a[3];
-}

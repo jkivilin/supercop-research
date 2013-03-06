@@ -1,3 +1,10 @@
+/*
+ * SuperCop glue code for AES (bitsliced AVX)
+ *
+ * Public domain, 2013/03/06
+ * Jussi Kivilinna
+ */
+
 #include <stdint.h>
 #include <memory.h>
 #include "crypto_stream.h"
