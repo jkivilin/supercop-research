@@ -1,7 +1,7 @@
 /*
  * Shared glue code for 128bit block ciphers, AVX assembler macros
  *
- * Copyright (c) 2012 Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+ * Copyright (c) 2012 Jussi Kivilinna <jussi.kivilinna@iki.fi>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

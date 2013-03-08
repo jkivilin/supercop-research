@@ -1,7 +1,7 @@
 /*
  * Serpent Cipher 8-way parallel algorithm (x86_64/SSE2)
  *
- * Copyright (C) 2011-2013 Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+ * Copyright (C) 2011-2013 Jussi Kivilinna <jussi.kivilinna@iki.fi>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
