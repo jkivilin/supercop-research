@@ -1,3 +1,10 @@
+/*
+ * SuperCop glue code for Blowfish
+ *
+ * Public domain, 2013/03/06
+ * Jussi Kivilinna
+ */
+
 #include "crypto_stream.h"
 #include <stdlib.h>
 #include "api.h"

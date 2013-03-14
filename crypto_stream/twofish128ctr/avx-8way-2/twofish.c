@@ -1,4 +1,4 @@
-/* Twofish for GPG
+/* Twofish
  * By Matthew Skala <mskala@ansuz.sooke.bc.ca>, July 26, 1998
  *
  * This code is a "clean room" implementation, written from the paper
@@ -10,11 +10,6 @@
  * the matrix operations in the key schedule, see the book _Contemporary
  * Abstract Algebra_ by Joseph A. Gallian, especially chapter 22 in the
  * Third Edition.
- *
- * Only the 128-bit block size is supported at present.  This code is intended
- * for GNU C on a 32-bit system, but it should work almost anywhere.  Loops
- * are unrolled, precomputation tables are used, etc., for maximum speed at
- * some cost in memory consumption.
  */
 
 #include <stdio.h>
@@ -24,17 +19,10 @@
 
 #include "twofish.h"
 
-#define uint8 uint8_t
-#define uint32 uint32_t
-
-/* Macros used by the info function. */
-#define FNCCAST_SETKEY(f)  ((int(*)(void*, uint8*, unsigned))(f))
-#define FNCCAST_CRYPT(f)   ((void(*)(void*, uint8*, uint8*))(f))
-
 /* These two tables are the q0 and q1 permutations, exactly as described in
  * the Twofish paper. */
 
-static const uint8 q0[256] = {
+static const uint8_t q0[256] = {
    0xA9, 0x67, 0xB3, 0xE8, 0x04, 0xFD, 0xA3, 0x76, 0x9A, 0x92, 0x80, 0x78,
    0xE4, 0xDD, 0xD1, 0x38, 0x0D, 0xC6, 0x35, 0x98, 0x18, 0xF7, 0xEC, 0x6C,
    0x43, 0x75, 0x37, 0x26, 0xFA, 0x13, 0x94, 0x48, 0xF2, 0xD0, 0x8B, 0x30,
@@ -59,7 +47,7 @@ static const uint8 q0[256] = {
    0x4A, 0x5E, 0xC1, 0xE0
 };
 
-static const uint8 q1[256] = {
+static const uint8_t q1[256] = {
    0x75, 0xF3, 0xC6, 0xF4, 0xDB, 0x7B, 0xFB, 0xC8, 0x4A, 0xD3, 0xE6, 0x6B,
    0x45, 0x7D, 0xE8, 0x4B, 0xD6, 0x32, 0xD8, 0xFD, 0x37, 0x71, 0xF1, 0xE1,
    0x30, 0x0F, 0xF8, 0x1B, 0x87, 0xFA, 0x06, 0x3F, 0x5E, 0xBA, 0xAE, 0x5B,
@@ -94,10 +82,10 @@ static const uint8 q1[256] = {
  * mds[2][i] = MDS (0 0 q1[i] 0)^T  mds[3][i] = MDS (0 0 0 q0[i])^T
  * where ^T means "transpose", the matrix multiply is performed in GF(2^8)
  * represented as GF(2)[x]/v(x) where v(x)=x^8+x^6+x^5+x^3+1 as described
- * by Schneier et al, and I'm casually glossing over the uint8/word
+ * by Schneier et al, and I'm casually glossing over the uint8_t/word
  * conversion issues. */
 
-static const uint32 mds[4][256] = {
+static const uint32_t mds[4][256] = {
    {0xBCBC3275, 0xECEC21F3, 0x202043C6, 0xB3B3C9F4, 0xDADA03DB, 0x02028B7B,
     0xE2E22BFB, 0x9E9EFAC8, 0xC9C9EC4A, 0xD4D409D3, 0x18186BE6, 0x1E1E9F6B,
     0x98980E45, 0xB2B2387D, 0xA6A6D2E8, 0x2626B74B, 0x3C3C57D6, 0x93938A32,
@@ -280,7 +268,7 @@ static const uint32 mds[4][256] = {
  * w(x)=x^8+x^6+x^3+x^2+1.  We care about doing that because it's part of the
  * definition of the RS matrix in the key schedule.  Elements of that field
  * are polynomials of degree not greater than 7 and all coefficients 0 or 1,
- * which can be represented naturally by uint8s (just substitute x=2).  In that
+ * which can be represented naturally by uint8_ts (just substitute x=2).  In that
  * form, GF(2^8) addition is the same as bitwise XOR, but GF(2^8)
  * multiplication is inefficient without hardware support.  To multiply
  * faster, I make use of the fact x is a generator for the nonzero elements,
@@ -308,7 +296,7 @@ static const uint32 mds[4][256] = {
  * see a non-horrible way of avoiding them, and I did manage to group the
  * statements so that each if covers four group multiplications. */
 
-static const uint8 poly_to_exp[255] = {
+static const uint8_t poly_to_exp[255] = {
    0x00, 0x01, 0x17, 0x02, 0x2E, 0x18, 0x53, 0x03, 0x6A, 0x2F, 0x93, 0x19,
    0x34, 0x54, 0x45, 0x04, 0x5C, 0x6B, 0xB6, 0x30, 0xA6, 0x94, 0x4B, 0x1A,
    0x8C, 0x35, 0x81, 0x55, 0xAA, 0x46, 0x0D, 0x05, 0x24, 0x5D, 0x87, 0x6C,
@@ -333,7 +321,7 @@ static const uint8 poly_to_exp[255] = {
    0x85, 0xC8, 0xA1
 };
 
-static const uint8 exp_to_poly[492] = {
+static const uint8_t exp_to_poly[492] = {
    0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x4D, 0x9A, 0x79, 0xF2,
    0xA9, 0x1F, 0x3E, 0x7C, 0xF8, 0xBD, 0x37, 0x6E, 0xDC, 0xF5, 0xA7, 0x03,
    0x06, 0x0C, 0x18, 0x30, 0x60, 0xC0, 0xCD, 0xD7, 0xE3, 0x8B, 0x5B, 0xB6,
@@ -378,13 +366,13 @@ static const uint8 exp_to_poly[492] = {
 };
 
 /* Macro to perform one column of the RS matrix multiplication.  The
- * parameters a, b, c, and d are the four uint8s of output; i is the index
- * of the key uint8s, and w, x, y, and z, are the column of constants from
+ * parameters a, b, c, and d are the four uint8_ts of output; i is the index
+ * of the key uint8_ts, and w, x, y, and z, are the column of constants from
  * the RS matrix, preprocessed through the poly_to_exp table. */
 
-static inline void calc_s(uint8 ki, uint8 *a, uint8 *b, uint8 *c, uint8 *d, uint8 w, uint8 x, uint8 y, uint8 z)
+static inline void calc_s(uint8_t ki, uint8_t *a, uint8_t *b, uint8_t *c, uint8_t *d, uint8_t w, uint8_t x, uint8_t y, uint8_t z)
 {
-   uint8 tmp;
+   uint8_t tmp;
 
    if (!ki)
       return;
@@ -414,8 +402,8 @@ static inline void calc_s(uint8 ki, uint8 *a, uint8 *b, uint8 *c, uint8 *d, uint
    ctx->s[3][i] = mds[3][q1[(b) ^ sd] ^ sh]
 
 static inline void calc_sb(struct twofish_ctx *ctx,
-			uint32 i, uint8 a, uint8 b, uint8 c, uint8 d, uint8 e, uint8 f, uint8 g, uint8 h,
-			uint8 sa, uint8 sb, uint8 sc, uint8 sd, uint8 se, uint8 sf, uint8 sg, uint8 sh)
+			uint32_t i, uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t h,
+			uint8_t sa, uint8_t sb, uint8_t sc, uint8_t sd, uint8_t se, uint8_t sf, uint8_t sg, uint8_t sh)
 {
    CALC_SB_2 (i, a, b);
    CALC_SB_2 ((i)+1, c, d);
@@ -429,7 +417,7 @@ static inline void calc_sb(struct twofish_ctx *ctx,
 /* Macros to calculate the whitening and round subkeys.  CALC_K_2 computes the
  * h() function for a given index (either 2i or 2i+1).	a and b are the index
  * preprocessed through q0 and q1 respectively; j is the index of the first
- * key uint8 to use.  CALC_K computes a pair of subkeys by calling CALC_K_2
+ * key uint8_t to use.  CALC_K computes a pair of subkeys by calling CALC_K_2
  * twice, doing the Psuedo-Hadamard Transform, and doing the necessary
  * rotations.  Its parameters are: a, the array to write the results into,
  * j, the index of the first output entry, k and l, the preprocessed indices
@@ -441,9 +429,9 @@ static inline void calc_sb(struct twofish_ctx *ctx,
    ^ mds[2][q1[a ^ key[(j) + 10]] ^ key[(j) + 2]] \
    ^ mds[3][q1[b ^ key[(j) + 11]] ^ key[(j) + 3]]
 
-static inline void calc_k(const uint8 *key, uint32 *a, uint32 j, uint8 k, uint8 l, uint8 m, uint8 n)
+static inline void calc_k(const uint8_t *key, uint32_t *a, uint32_t j, uint8_t k, uint8_t l, uint8_t m, uint8_t n)
 {
-   uint32 x, y;
+   uint32_t x, y;
 
    x = CALC_K_2 (k, l, 0);
    y = CALC_K_2 (m, n, 4);
@@ -460,11 +448,11 @@ static inline void calc_k(const uint8 *key, uint32 *a, uint32 j, uint8 k, uint8 
 /* Perform the key setup.  Note that this works *only* with 128-bit keys,
  * despite the API that makes it look like it might support other sizes. */
 
-static int __twofish_setkey(struct twofish_ctx *ctx, const uint8 *key, const unsigned keylen)
+static int __twofish_setkey(struct twofish_ctx *ctx, const uint8_t *key, const unsigned keylen)
 {
    /* The S vector used to key the S-boxes, split up into individual
-    * uint8s. */
-   uint8 sa = 0, sb = 0, sc = 0, sd = 0, se = 0, sf = 0, sg = 0, sh = 0;
+    * uint8_ts. */
+   uint8_t sa = 0, sb = 0, sc = 0, sd = 0, se = 0, sf = 0, sg = 0, sh = 0;
 
    /* Check key length. */
    assert (keylen == 16);
@@ -584,7 +572,7 @@ static int __twofish_setkey(struct twofish_ctx *ctx, const uint8 *key, const uns
 
 void twofish_init(struct twofish_ctx *ctx, const uint8_t key[], uint32_t keybytes)
 {
-	uint8 buf[16];
+	uint8_t buf[16];
 	int i, j;
 
 	/*memset(ctx, 0, sizeof(*ctx));*/
