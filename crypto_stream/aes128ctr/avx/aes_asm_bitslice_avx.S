@@ -766,7 +766,6 @@ aes_keysched_bitslice_avx:
 	 */
 
 	vmovdqu 0*16(%rdi), %xmm0;
-	movq %rsi, ROUT;
 
 	testb %dl, %dl;
 	jnz .Lkeysched_cont;
