@@ -77,6 +77,10 @@
 	.byte 0x02, 0x03, 0x00, 0x01, 0x06, 0x07, 0x04, 0x05
 	.byte 0x0a, 0x0b, 0x08, 0x09, 0x0e, 0x0f, 0x0c, 0x0d
 
+.Laffinetransform_const:
+	.byte 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63
+	.byte 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63
+
 .align 4
 
 .L_bs0:
@@ -562,48 +566,42 @@
 
 #define subbytes(b0, b1, b2, b3, b4, b5, b6, b7, \
 		 t0, t1, t2, t3, s0, s1, s2, s3) \
-	InBasisChange(b0, b1, b2, b3, b4, b5, b6, b7); \
-	Inv_GF256(b6, b5, b0, b3, b7, b1, b4, b2, t0, t1, t2, t3, s0, s1, s2, s3); \
-	OutBasisChange(b7, b1, b4, b2, b6, b5, b0, b3, t0, t1, t2, t3, s0, s1, s2, s3);
+	InBasisChange(b0, b1, b2, b3, b4, b5, b6, b7, t0); \
+	Inv_GF256(b6, t0, b0, b3, b7, b1, b4, b2, b5, t1, t2, t3, s0, s1, s2, s3); \
+	OutBasisChange(b7, b1, b4, b2, b6, t0, b0, b3, b5, t1, t2, t3, s0, s1, s2, s3);
 
 #define OutBasisChange(b7, b1, b4, b2, b6, b5, b0, b3, \
 		       t0, t1, t2, t3, t4, t5, t6, t7) \
-	vpcmpeqd t7, t7, t7;    \
-	\
 	vpxor    b7, b0, t0;    \
 	vpxor    b1, b6, t1;    \
 	vpxor    b4, t0, t2;    \
 	vpxor    b6, b0, t4;    \
-	vpxor    b0, t1, t6;    \
+	vpxor    b0, t1, b0;    \
 	\
-	vpxor    b5, t1, t1;    \
+	vpxor    b5, t1, b1;    \
 	vpxor    b5, b2, b7;    \
-	vpxor    b2, b3, t3;    \
+	vpxor    b2, b3, b6;    \
 	vpxor    t2, b7, b2;    \
 	vpxor    b3, b7, b4;    \
 	\
-	vpxor    t6, t7, b0;    \
-	vpxor    t1, t7, b1;    \
-	vpxor    t4, b4, b3;    \
-	vpxor    t0, t7, b5;    \
-	vpxor    t3, t7, b6;
+	vpxor    t4, b4, b3;
 
-#define InBasisChange(b0, b1, b2, b3, b4, b5, b6, b7) \
+#define InBasisChange(b0, b1, b2, b3, b4, b5, b6, b7, t5) \
 	vpxor    b6, b5, b5;    \
 	vpxor    b1, b2, b2;    \
-	vpxor    b0, b5, b5;    \
+	vpxor    b0, b5, t5;    \
 	vpxor    b2, b6, b6;    \
 	vpxor    b0, b3, b3;    \
 	\
 	vpxor    b3, b6, b6;    \
 	vpxor    b7, b3, b3;    \
-	vpxor    b5, b7, b7;    \
+	vpxor    t5, b7, b7;    \
 	vpxor    b4, b3, b3;    \
-	vpxor    b5, b4, b4;    \
+	vpxor    t5, b4, b4;    \
 	\
 	vpxor    b1, b3, b3;    \
 	vpxor    b7, b2, b2;    \
-	vpxor    b5, b1, b1;
+	vpxor    t5, b1, b1;
 
 #define Mul_GF4_N(x0, x1, y0, y1, t0) \
 	vpxor    y0, y1, t0;    \
@@ -757,17 +755,25 @@
 		     t0, t1, t2);
 
 .align 8
-.global aes_keyshed_bitslice_avx
-.type   aes_keyshed_bitslice_avx,@function;
+.global aes_keysched_bitslice_avx
+.type   aes_keysched_bitslice_avx,@function;
 
-aes_keyshed_bitslice_avx:
+aes_keysched_bitslice_avx:
 	/* input:
 	 *	%rdi: in, keyshed (16 bytes)
 	 *	%rsi: out, bitsliced keyshed (8 * 16 bytes)
+	 *	 %dl: in, bool: is first
 	 */
 
 	vmovdqu 0*16(%rdi), %xmm0;
+	movq %rsi, ROUT;
 
+	testb %dl, %dl;
+	jnz .Lkeysched_cont;
+
+	vpxor .Laffinetransform_const, %xmm0, %xmm0;
+
+.Lkeysched_cont:
 	vmovdqa %xmm0, %xmm1;
 	vmovdqa %xmm0, %xmm2;
 	vmovdqa %xmm0, %xmm3;

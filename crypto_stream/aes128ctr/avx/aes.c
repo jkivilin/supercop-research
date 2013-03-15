@@ -506,15 +506,16 @@ static void aes_setup(struct aes_ctx * ctx, const uint8_t *key, int __keylen)
 #endif
 }
 
-extern void aes_keyshed_bitslice_avx(uint32_t *keysched, uint32_t* bitsliced_keysched);
+extern void aes_keysched_bitslice_avx(uint32_t *keysched, uint32_t* bitsliced_keysched, char first);
 
 void aes_init_bitslice(struct aes_ctx_bitslice *ctx, const uint8_t *key, int keylen)
 {
 	uint32_t *keysched = (void *)ctx->ctx.keysched;
 	int i;
+	char first;
 
 	aes_setup(&ctx->ctx, key, keylen);
 
-	for (i = 0; i < ctx->ctx.Nr + 1; i++)
-		aes_keyshed_bitslice_avx(&keysched[i * AES_MAX_NB], (uint32_t*)ctx->bitsliced_keysched[i]);
+	for (i = 0, first = 1; i < ctx->ctx.Nr + 1; i++, first = 0)
+		aes_keysched_bitslice_avx(&keysched[i * AES_MAX_NB], (uint32_t*)ctx->bitsliced_keysched[i], first);
 }
