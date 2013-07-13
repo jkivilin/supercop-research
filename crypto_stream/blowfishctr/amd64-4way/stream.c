@@ -21,7 +21,7 @@ int crypto_stream_xor(unsigned char *out, const unsigned char *in,
 {
 #define PTR_ALIGN(ptr, mask) ((void *)((((long)(ptr)) + (mask)) & ~((long)(mask))))
 	const unsigned long align = 16;
-	static char ctxbuf[sizeof(struct blowfish_ctx) + /*align*/16];
+	char ctxbuf[sizeof(struct blowfish_ctx) + align];
 	struct blowfish_ctx *ctx = PTR_ALIGN(ctxbuf, align - 1);
 	uint64_t iv;
 	uint64_t ivs[4];

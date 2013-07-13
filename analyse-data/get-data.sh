@@ -142,7 +142,8 @@ cat algorithms \
 
   echo "Generating '$typef' plots for $machine/$algorithm..."
 
-  for datatype in cycles xor_cycles; do for xrange in "0:4096" "0:1024" "2048:4096"; do
+#  for datatype in cycles xor_cycles; do for xrange in "0:4096" "0:1024" "2048:4096"; do
+  for datatype in cycles xor_cycles; do for xrange in "0:4096"; do
     if [ "$xrange" != "" ]; then
       xrangename="-${xrange/:/_}"
     else
