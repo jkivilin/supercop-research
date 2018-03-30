@@ -94,9 +94,34 @@ cat algorithms \
       for datatype in cycles xor_cycles; do
         ## get implementation information
         cycles_file=$work/$datatype-$implementation.dat
+        cycles_full_file=$work/$datatype-$implementation-full.dat
         touch $cycles_file
+        touch $cycles_full_file
         echo "#$implementation" >> $cycles_file
         echo "#bytes $datatype" >> $cycles_file
+        echo "#$implementation" >> $cycles_full_file
+        echo "#bytes $datatype" >> $cycles_full_file
+
+        ## get full data of measurement runs
+        cat "$datapath/data" \
+        | grep " $datatype " \
+        | awk '{print $8 " " $10 " " $11 " " $12 " " $13 " " $14 " " $15 " " $16 " " $17 " " $18 " " $19 " " $20 " " $21 " " $22 " " $23 " " $24 }' \
+        | sort -k 1n -k 2n \
+        | (
+          unset -v values
+          declare -a values
+
+          while read cycles v1 v2 v3 v4 v5 v6 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15; do
+            ## add new array to values array, matching cells are merged
+            values[$cycles]="${values[$cycles]} $v1 $v2 $v3 $v4 $v5 $v6 $v7 $v8 $v9 $v10 $v11 $v12 $v13 $v14 $v15"
+          done
+
+          for ((i=0;i<=4096;i++)) do
+            ## print median of measurements
+            echo -n "$i "
+            echo ${values[$i]}
+          done
+        ) >> $cycles_full_file
 
         ## get median of measurement runs
         cat "$datapath/data" \
@@ -122,6 +147,7 @@ cat algorithms \
         ) >> $cycles_file
 
         mv $cycles_file $machine/$algorithm/$implementation/$datatype.dat
+        mv $cycles_full_file $machine/$algorithm/$implementation/$datatype-full.dat
       done
     ) &
   done
